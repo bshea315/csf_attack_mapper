@@ -1,0 +1,661 @@
+version: 1
+description: "Starter MITRE ATT&CK mapping rules for SPL detections"
+rules:
+  # ============================================
+  # CREDENTIAL ACCESS
+  # ============================================
+  - id: win_logon_bruteforce
+    name: Windows brute force / password spraying signals
+    technique_id: T1110
+    confidence: 0.72
+    match:
+      any_keywords:
+        - "password spray"
+        - "brute force"
+        - "multiple failed logons"
+        - "failed authentication"
+        - "account lockout"
+      any_event_ids:
+        - 4625
+        - 4771
+        - 4776
+      any_sourcetypes:
+        - "WinEventLog:Security"
+        - "XmlWinEventLog:Security"
+      any_regex:
+        - "(?i)EventCode\\s*=\\s*4625"
+        - "(?i)FailureReason"
+        - "(?i)LogonType\\s*=\\s*(3|10)"
+    rationale: "Repeated failed logons or 4625 events indicate potential brute force or password spraying (T1110)."
+
+  - id: win_credential_dumping_lsass
+    name: LSASS access / credential dumping
+    technique_id: T1003.001
+    confidence: 0.82
+    match:
+      any_keywords:
+        - "lsass"
+        - "sekurlsa"
+        - "mimikatz"
+        - "procdump"
+        - "credential dump"
+        - "hashdump"
+      any_sourcetypes:
+        - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        - "WinEventLog:Security"
+      any_event_ids:
+        - 10
+        - 4688
+      any_regex:
+        - "(?i)TargetImage\\s*=.*lsass\\.exe"
+        - "(?i)Image\\s*=.*procdump"
+        - "(?i)CallTrace.*ntdll"
+    rationale: "Access to LSASS process memory is a key indicator of credential dumping (T1003.001)."
+
+  - id: win_credential_dumping_sam
+    name: SAM database access
+    technique_id: T1003.002
+    confidence: 0.75
+    match:
+      any_keywords:
+        - "SAM"
+        - "reg save"
+        - "shadow copy"
+        - "ntds.dit"
+        - "SYSTEM hive"
+      any_regex:
+        - "(?i)reg\\s+save\\s+HKLM\\\\SAM"
+        - "(?i)reg\\s+save\\s+HKLM\\\\SYSTEM"
+        - "(?i)ntdsutil"
+    rationale: "Accessing SAM database or registry hives indicates credential theft attempts (T1003.002)."
+
+  - id: kerberoasting
+    name: Kerberoasting detection
+    technique_id: T1558.003
+    confidence: 0.78
+    match:
+      any_keywords:
+        - "kerberoast"
+        - "TGS request"
+        - "service ticket"
+        - "RC4 encryption"
+      any_event_ids:
+        - 4769
+      any_regex:
+        - "(?i)TicketEncryptionType.*0x17"
+        - "(?i)ServiceName.*\\$"
+    rationale: "Kerberos service ticket requests with weak encryption indicate Kerberoasting (T1558.003)."
+
+  # ============================================
+  # INITIAL ACCESS
+  # ============================================
+  - id: phishing_attachment
+    name: Suspicious email attachment execution
+    technique_id: T1566.001
+    confidence: 0.65
+    match:
+      any_keywords:
+        - "phishing"
+        - "malicious attachment"
+        - "macro execution"
+        - "email attachment"
+      any_fields:
+        - "AttachmentName"
+        - "SenderAddress"
+      any_regex:
+        - "(?i)\\.(doc|docm|xls|xlsm|ppt|pptm|hta|js|vbs)\\b"
+    rationale: "Office document or script execution from email indicates potential phishing (T1566.001)."
+
+  # ============================================
+  # EXECUTION
+  # ============================================
+  - id: powershell_execution
+    name: PowerShell suspicious execution
+    technique_id: T1059.001
+    confidence: 0.70
+    match:
+      any_keywords:
+        - "powershell"
+        - "encoded command"
+        - "bypass"
+        - "downloadstring"
+        - "invoke-expression"
+        - "iex"
+      any_sourcetypes:
+        - "WinEventLog:Microsoft-Windows-PowerShell/Operational"
+        - "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational"
+      any_event_ids:
+        - 4103
+        - 4104
+      any_regex:
+        - "(?i)-enc[odedcommand]*\\s"
+        - "(?i)bypass\\s+-?exec"
+        - "(?i)IEX\\s*\\("
+        - "(?i)Invoke-Expression"
+    rationale: "Encoded or obfuscated PowerShell commands indicate malicious execution (T1059.001)."
+
+  - id: cmd_execution
+    name: Command shell execution
+    technique_id: T1059.003
+    confidence: 0.55
+    match:
+      any_keywords:
+        - "cmd.exe"
+        - "command prompt"
+        - "cmd /c"
+      any_regex:
+        - "(?i)cmd\\.exe.*\\/c"
+        - "(?i)cmd\\.exe.*\\/k"
+    rationale: "Windows Command Shell execution patterns indicate command-line abuse (T1059.003)."
+
+  - id: wmi_execution
+    name: WMI execution
+    technique_id: T1047
+    confidence: 0.68
+    match:
+      any_keywords:
+        - "wmic"
+        - "WMI"
+        - "Win32_Process"
+        - "wmiprvse"
+      any_event_ids:
+        - 5857
+        - 5858
+        - 5859
+      any_regex:
+        - "(?i)wmic\\s+process\\s+call"
+        - "(?i)Win32_Process.*Create"
+    rationale: "WMI process creation indicates potential remote or local execution (T1047)."
+
+  - id: scheduled_task_creation
+    name: Scheduled task creation
+    technique_id: T1053.005
+    confidence: 0.72
+    match:
+      any_keywords:
+        - "schtasks"
+        - "scheduled task"
+        - "at.exe"
+        - "task scheduler"
+      any_event_ids:
+        - 4698
+        - 4699
+        - 4700
+        - 4701
+      any_regex:
+        - "(?i)schtasks.*\\/create"
+        - "(?i)TaskScheduler"
+    rationale: "Scheduled task creation is a common persistence mechanism (T1053.005)."
+
+  - id: mshta_execution
+    name: MSHTA execution
+    technique_id: T1218.005
+    confidence: 0.78
+    match:
+      any_keywords:
+        - "mshta"
+        - "hta file"
+      any_regex:
+        - "(?i)mshta\\.exe"
+        - "(?i)\\.hta\\b"
+    rationale: "MSHTA is commonly abused to execute malicious HTA files (T1218.005)."
+
+  - id: rundll32_execution
+    name: Rundll32 suspicious execution
+    technique_id: T1218.011
+    confidence: 0.65
+    match:
+      any_keywords:
+        - "rundll32"
+        - "dll execution"
+      any_regex:
+        - "(?i)rundll32\\.exe.*javascript"
+        - "(?i)rundll32\\.exe.*http"
+        - "(?i)rundll32\\.exe.*shell32"
+    rationale: "Rundll32 abuse for proxy execution of malicious code (T1218.011)."
+
+  # ============================================
+  # PERSISTENCE
+  # ============================================
+  - id: registry_run_keys
+    name: Registry Run key modification
+    technique_id: T1547.001
+    confidence: 0.75
+    match:
+      any_keywords:
+        - "Run key"
+        - "RunOnce"
+        - "registry persistence"
+        - "autostart"
+      any_event_ids:
+        - 13
+      any_regex:
+        - "(?i)\\\\Run\\b"
+        - "(?i)\\\\RunOnce\\b"
+        - "(?i)CurrentVersion\\\\Run"
+    rationale: "Registry Run key modifications are common persistence mechanisms (T1547.001)."
+
+  - id: service_creation
+    name: Windows service creation
+    technique_id: T1543.003
+    confidence: 0.70
+    match:
+      any_keywords:
+        - "service creation"
+        - "sc create"
+        - "new service"
+      any_event_ids:
+        - 4697
+        - 7045
+      any_regex:
+        - "(?i)sc\\s+create"
+        - "(?i)ServiceType.*own"
+    rationale: "New service creation can indicate persistence establishment (T1543.003)."
+
+  # ============================================
+  # PRIVILEGE ESCALATION
+  # ============================================
+  - id: uac_bypass
+    name: UAC bypass attempt
+    technique_id: T1548.002
+    confidence: 0.80
+    match:
+      any_keywords:
+        - "UAC bypass"
+        - "fodhelper"
+        - "eventvwr"
+        - "sdclt"
+        - "elevation"
+      any_regex:
+        - "(?i)fodhelper\\.exe"
+        - "(?i)eventvwr\\.exe"
+        - "(?i)sdclt\\.exe"
+    rationale: "Known UAC bypass techniques using auto-elevation binaries (T1548.002)."
+
+  # ============================================
+  # DEFENSE EVASION
+  # ============================================
+  - id: clearing_event_logs
+    name: Event log clearing
+    technique_id: T1070.001
+    confidence: 0.85
+    match:
+      any_keywords:
+        - "clear event log"
+        - "wevtutil cl"
+        - "log deletion"
+      any_event_ids:
+        - 1102
+        - 104
+      any_regex:
+        - "(?i)wevtutil\\s+cl"
+        - "(?i)Clear-EventLog"
+    rationale: "Event log clearing indicates attempt to cover tracks (T1070.001)."
+
+  - id: disable_defender
+    name: Disabling Windows Defender
+    technique_id: T1562.001
+    confidence: 0.82
+    match:
+      any_keywords:
+        - "disable defender"
+        - "tamper protection"
+        - "real-time protection"
+        - "Set-MpPreference"
+      any_regex:
+        - "(?i)Set-MpPreference.*-Disable"
+        - "(?i)DisableRealtimeMonitoring"
+    rationale: "Disabling security tools is a key defense evasion technique (T1562.001)."
+
+  - id: process_injection
+    name: Process injection
+    technique_id: T1055
+    confidence: 0.75
+    match:
+      any_keywords:
+        - "process injection"
+        - "CreateRemoteThread"
+        - "WriteProcessMemory"
+        - "VirtualAllocEx"
+      any_event_ids:
+        - 8
+        - 10
+      any_regex:
+        - "(?i)CreateRemoteThread"
+        - "(?i)SourceImage.*Target"
+    rationale: "Process injection patterns indicate code injection attempts (T1055)."
+
+  # ============================================
+  # DISCOVERY
+  # ============================================
+  - id: domain_trust_discovery
+    name: Domain trust discovery
+    technique_id: T1482
+    confidence: 0.68
+    match:
+      any_keywords:
+        - "nltest"
+        - "domain trust"
+        - "Get-ADTrust"
+        - "dsquery trustedDomain"
+      any_regex:
+        - "(?i)nltest.*\\/domain_trusts"
+        - "(?i)Get-ADTrust"
+    rationale: "Domain trust enumeration indicates reconnaissance activity (T1482)."
+
+  - id: network_share_discovery
+    name: Network share discovery
+    technique_id: T1135
+    confidence: 0.60
+    match:
+      any_keywords:
+        - "net share"
+        - "net view"
+        - "shares enumeration"
+      any_regex:
+        - "(?i)net\\s+view"
+        - "(?i)net\\s+share"
+    rationale: "Network share enumeration indicates lateral movement preparation (T1135)."
+
+  - id: account_discovery
+    name: Account discovery
+    technique_id: T1087
+    confidence: 0.58
+    match:
+      any_keywords:
+        - "net user"
+        - "net localgroup"
+        - "Get-LocalUser"
+        - "whoami"
+      any_regex:
+        - "(?i)net\\s+user"
+        - "(?i)net\\s+localgroup"
+        - "(?i)Get-ADUser"
+    rationale: "Account enumeration indicates reconnaissance activity (T1087)."
+
+  # ============================================
+  # LATERAL MOVEMENT
+  # ============================================
+  - id: psexec_execution
+    name: PsExec lateral movement
+    technique_id: T1021.002
+    confidence: 0.80
+    match:
+      any_keywords:
+        - "psexec"
+        - "PSEXESVC"
+        - "remote execution"
+      any_event_ids:
+        - 5145
+      any_regex:
+        - "(?i)psexec"
+        - "(?i)PSEXESVC"
+        - "(?i)\\\\ADMIN\\$"
+    rationale: "PsExec usage indicates SMB-based lateral movement (T1021.002)."
+
+  - id: rdp_connection
+    name: RDP lateral movement
+    technique_id: T1021.001
+    confidence: 0.55
+    match:
+      any_keywords:
+        - "remote desktop"
+        - "RDP"
+        - "mstsc"
+        - "terminal services"
+      any_event_ids:
+        - 4624
+        - 4778
+        - 4779
+      any_regex:
+        - "(?i)LogonType\\s*=\\s*10"
+        - "(?i)mstsc"
+    rationale: "RDP connections can indicate lateral movement (T1021.001)."
+
+  - id: wmi_lateral
+    name: WMI lateral movement
+    technique_id: T1021.003
+    confidence: 0.72
+    match:
+      any_keywords:
+        - "wmiexec"
+        - "remote wmi"
+        - "WMIC /node"
+      any_regex:
+        - "(?i)wmic\\s+/node:"
+        - "(?i)wmiexec"
+    rationale: "Remote WMI execution indicates lateral movement (T1021.003)."
+
+  # ============================================
+  # COLLECTION
+  # ============================================
+  - id: email_collection
+    name: Email collection
+    technique_id: T1114
+    confidence: 0.70
+    match:
+      any_keywords:
+        - "outlook export"
+        - "pst file"
+        - "email export"
+        - "mailbox export"
+      any_regex:
+        - "(?i)\\.pst\\b"
+        - "(?i)Export-Mailbox"
+    rationale: "Email export or PST access indicates email collection (T1114)."
+
+  # ============================================
+  # COMMAND AND CONTROL
+  # ============================================
+  - id: dns_tunneling
+    name: DNS tunneling
+    technique_id: T1071.004
+    confidence: 0.75
+    match:
+      any_keywords:
+        - "dns tunnel"
+        - "dns exfil"
+        - "dns beacon"
+        - "high entropy dns"
+      any_fields:
+        - "query_length"
+        - "dns_query"
+      any_regex:
+        - "(?i)query.*length.*>\\s*50"
+    rationale: "Long DNS queries or high-entropy domains indicate DNS tunneling (T1071.004)."
+
+  # ============================================
+  # AZURE AD / ENTRA ID
+  # ============================================
+  - id: azure_ad_impossible_travel
+    name: Azure AD impossible travel / risky sign-in
+    technique_id: T1078.004
+    confidence: 0.68
+    match:
+      any_keywords:
+        - "impossible travel"
+        - "risky sign-in"
+        - "atypical travel"
+        - "unfamiliar location"
+      any_sourcetypes:
+        - "azure:aad:signin"
+        - "o365:management:activity"
+        - "azure:monitor:aad"
+    rationale: "Impossible travel or risky sign-in indicates potential account compromise (T1078.004)."
+
+  - id: azure_ad_consent_grant
+    name: Azure AD suspicious app consent
+    technique_id: T1098.003
+    confidence: 0.72
+    match:
+      any_keywords:
+        - "consent grant"
+        - "OAuth application"
+        - "app permission"
+        - "Add app role assignment"
+      any_sourcetypes:
+        - "azure:aad:audit"
+        - "o365:management:activity"
+      any_regex:
+        - "(?i)ConsentToApplication"
+        - "(?i)Add app role"
+    rationale: "Application consent grants can enable persistence via OAuth (T1098.003)."
+
+  - id: azure_conditional_access_change
+    name: Azure Conditional Access policy change
+    technique_id: T1556
+    confidence: 0.70
+    match:
+      any_keywords:
+        - "conditional access"
+        - "policy change"
+        - "CA policy"
+      any_sourcetypes:
+        - "azure:aad:audit"
+      any_regex:
+        - "(?i)Update conditional access policy"
+        - "(?i)Delete conditional access policy"
+    rationale: "Conditional Access changes can weaken authentication controls (T1556)."
+
+  # ============================================
+  # AWS CLOUDTRAIL
+  # ============================================
+  - id: aws_iam_policy_change
+    name: AWS IAM policy privilege escalation
+    technique_id: T1098.001
+    confidence: 0.65
+    match:
+      any_keywords:
+        - "PutUserPolicy"
+        - "AttachUserPolicy"
+        - "CreatePolicyVersion"
+        - "PassRole"
+        - "UpdateAssumeRolePolicy"
+      any_sourcetypes:
+        - "aws:cloudtrail"
+    rationale: "IAM policy changes can enable privilege escalation (T1098.001)."
+
+  - id: aws_access_key_creation
+    name: AWS access key creation
+    technique_id: T1098.001
+    confidence: 0.60
+    match:
+      any_keywords:
+        - "CreateAccessKey"
+        - "access key"
+      any_sourcetypes:
+        - "aws:cloudtrail"
+      any_regex:
+        - "(?i)eventName.*CreateAccessKey"
+    rationale: "Creating new access keys can enable persistent access (T1098.001)."
+
+  - id: aws_sts_assume_role
+    name: AWS STS AssumeRole anomaly
+    technique_id: T1550.001
+    confidence: 0.58
+    match:
+      any_keywords:
+        - "AssumeRole"
+        - "AssumeRoleWithSAML"
+        - "GetSessionToken"
+      any_sourcetypes:
+        - "aws:cloudtrail"
+    rationale: "AssumeRole abuse can enable cross-account access (T1550.001)."
+
+  - id: aws_security_group_change
+    name: AWS security group modification
+    technique_id: T1562.007
+    confidence: 0.62
+    match:
+      any_keywords:
+        - "AuthorizeSecurityGroupIngress"
+        - "security group"
+        - "0.0.0.0/0"
+      any_sourcetypes:
+        - "aws:cloudtrail"
+    rationale: "Security group changes can expose resources to attack (T1562.007)."
+
+  # ============================================
+  # OFFICE 365
+  # ============================================
+  - id: o365_mailbox_forwarding
+    name: O365 mailbox auto-forwarding
+    technique_id: T1114.003
+    confidence: 0.75
+    match:
+      any_keywords:
+        - "Set-InboxRule"
+        - "New-InboxRule"
+        - "ForwardingSmtpAddress"
+        - "RedirectTo"
+        - "mailbox forwarding"
+      any_sourcetypes:
+        - "o365:management:activity"
+        - "ms:o365:management"
+      any_regex:
+        - "(?i)ForwardTo"
+        - "(?i)RedirectTo"
+    rationale: "Email forwarding rules can exfiltrate email content (T1114.003)."
+
+  - id: o365_oauth_app
+    name: O365 OAuth application access
+    technique_id: T1098.003
+    confidence: 0.68
+    match:
+      any_keywords:
+        - "OAuth"
+        - "consent"
+        - "application permission"
+        - "delegated permission"
+      any_sourcetypes:
+        - "o365:management:activity"
+    rationale: "OAuth application grants can enable persistent access (T1098.003)."
+
+  - id: o365_suspicious_signin
+    name: O365 suspicious sign-in
+    technique_id: T1078.004
+    confidence: 0.62
+    match:
+      any_keywords:
+        - "suspicious sign-in"
+        - "unfamiliar features"
+        - "anonymous IP"
+        - "leaked credentials"
+      any_sourcetypes:
+        - "o365:management:activity"
+        - "azure:aad:signin"
+    rationale: "Suspicious sign-in patterns indicate potential account compromise (T1078.004)."
+
+  # ============================================
+  # EDR / GENERIC PATTERNS
+  # ============================================
+  - id: suspicious_process_parent
+    name: Suspicious parent-child process
+    technique_id: T1059
+    confidence: 0.65
+    match:
+      any_keywords:
+        - "suspicious parent"
+        - "unusual parent"
+        - "process chain"
+      any_fields:
+        - "ParentImage"
+        - "ParentCommandLine"
+        - "parent_process"
+    rationale: "Unusual parent-child process relationships indicate suspicious execution (T1059)."
+
+  - id: encoded_payload
+    name: Encoded or obfuscated payload
+    technique_id: T1027
+    confidence: 0.70
+    match:
+      any_keywords:
+        - "encoded"
+        - "obfuscated"
+        - "base64"
+        - "certutil decode"
+      any_regex:
+        - "(?i)-enc[odedcommand]*"
+        - "(?i)certutil.*-decode"
+        - "(?i)frombase64"
+    rationale: "Encoded payloads indicate attempt to evade detection (T1027)."

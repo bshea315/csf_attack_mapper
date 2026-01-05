@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* SPL syntax highlighting placeholder */
+.spl-code {
+  @apply font-mono text-sm bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto;
+}
+
+/* Coverage heatmap colors */
+.coverage-none { @apply bg-gray-100; }
+.coverage-low { @apply bg-red-100; }
+.coverage-medium { @apply bg-yellow-100; }
+.coverage-good { @apply bg-green-100; }
+.coverage-high { @apply bg-green-200; }

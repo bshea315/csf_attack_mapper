@@ -1,0 +1,511 @@
+version: 1
+description: "MITRE ATT&CK to NIST CSF 2.0 crosswalk mappings"
+mappings:
+  # ============================================
+  # CREDENTIAL ACCESS -> DETECT + PROTECT + GOVERN
+  # ============================================
+  - technique_id: T1110
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.65
+    rationale: "Brute force attacks are primarily detected through continuous monitoring of authentication events."
+
+  - technique_id: T1110
+    csf:
+      function: "PROTECT"
+      category: "PR.AA"
+      subcategory: "PR.AA-1"
+    weight: 0.45
+    rationale: "Protection against brute force includes account lockout policies and MFA."
+
+  - technique_id: T1003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.70
+    rationale: "Credential dumping detection requires monitoring of process access patterns."
+
+  - technique_id: T1003
+    csf:
+      function: "PROTECT"
+      category: "PR.DS"
+      subcategory: "PR.DS-1"
+    weight: 0.55
+    rationale: "Data protection controls help prevent credential exposure."
+
+  - technique_id: T1003.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.75
+    rationale: "LSASS access monitoring is critical for detecting credential theft."
+
+  - technique_id: T1558.003
+    csf:
+      function: "DETECT"
+      category: "DE.AE"
+      subcategory: "DE.AE-2"
+    weight: 0.68
+    rationale: "Kerberoasting requires anomaly detection in authentication patterns."
+
+  # ============================================
+  # VALID ACCOUNTS -> GOVERN + PROTECT + DETECT
+  # ============================================
+  - technique_id: T1078
+    csf:
+      function: "GOVERN"
+      category: "GV.RM"
+      subcategory: "GV.RM-1"
+    weight: 0.50
+    rationale: "Valid account abuse reflects risk management and identity governance decisions."
+
+  - technique_id: T1078
+    csf:
+      function: "PROTECT"
+      category: "PR.AA"
+      subcategory: "PR.AA-3"
+    weight: 0.60
+    rationale: "Access management controls protect against account misuse."
+
+  - technique_id: T1078
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.55
+    rationale: "Continuous monitoring detects anomalous account usage."
+
+  - technique_id: T1078.004
+    csf:
+      function: "DETECT"
+      category: "DE.AE"
+      subcategory: "DE.AE-2"
+    weight: 0.65
+    rationale: "Cloud account abuse requires behavioral anomaly detection."
+
+  - technique_id: T1078.004
+    csf:
+      function: "GOVERN"
+      category: "GV.SC"
+      subcategory: "GV.SC-3"
+    weight: 0.45
+    rationale: "Cloud identity management is part of supply chain security governance."
+
+  # ============================================
+  # EXECUTION -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1059
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.70
+    rationale: "Command execution monitoring is core to endpoint detection."
+
+  - technique_id: T1059
+    csf:
+      function: "PROTECT"
+      category: "PR.PS"
+      subcategory: "PR.PS-1"
+    weight: 0.50
+    rationale: "Application controls can prevent unauthorized execution."
+
+  - technique_id: T1059.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.72
+    rationale: "PowerShell logging and monitoring is critical for detection."
+
+  - technique_id: T1059.003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.60
+    rationale: "Command shell activity monitoring for suspicious patterns."
+
+  - technique_id: T1047
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.65
+    rationale: "WMI execution monitoring detects lateral movement and execution."
+
+  - technique_id: T1053.005
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.68
+    rationale: "Scheduled task monitoring detects persistence establishment."
+
+  - technique_id: T1053.005
+    csf:
+      function: "PROTECT"
+      category: "PR.PS"
+      subcategory: "PR.PS-1"
+    weight: 0.45
+    rationale: "Configuration management can restrict scheduled task creation."
+
+  # ============================================
+  # PERSISTENCE -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1547.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-6"
+    weight: 0.70
+    rationale: "Registry monitoring detects autostart persistence."
+
+  - technique_id: T1547.001
+    csf:
+      function: "PROTECT"
+      category: "PR.PS"
+      subcategory: "PR.PS-1"
+    weight: 0.48
+    rationale: "Configuration baselines help detect unauthorized changes."
+
+  - technique_id: T1543.003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.65
+    rationale: "Service creation monitoring for persistence detection."
+
+  # ============================================
+  # DEFENSE EVASION -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1070.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.75
+    rationale: "Log clearing detection is critical for maintaining audit trail."
+
+  - technique_id: T1070.001
+    csf:
+      function: "PROTECT"
+      category: "PR.DS"
+      subcategory: "PR.DS-6"
+    weight: 0.55
+    rationale: "Log integrity protection prevents tampering."
+
+  - technique_id: T1562.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.78
+    rationale: "Security tool tampering detection is high priority."
+
+  - technique_id: T1562.001
+    csf:
+      function: "PROTECT"
+      category: "PR.PS"
+      subcategory: "PR.PS-2"
+    weight: 0.60
+    rationale: "Endpoint protection includes tamper protection."
+
+  - technique_id: T1055
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.72
+    rationale: "Process injection detection requires endpoint monitoring."
+
+  - technique_id: T1027
+    csf:
+      function: "DETECT"
+      category: "DE.AE"
+      subcategory: "DE.AE-4"
+    weight: 0.65
+    rationale: "Obfuscation detection requires advanced analysis capabilities."
+
+  - technique_id: T1548.002
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.68
+    rationale: "UAC bypass attempts should be monitored."
+
+  # ============================================
+  # DISCOVERY -> DETECT
+  # ============================================
+  - technique_id: T1482
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.55
+    rationale: "Domain trust enumeration indicates reconnaissance."
+
+  - technique_id: T1135
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.50
+    rationale: "Network share discovery precedes lateral movement."
+
+  - technique_id: T1087
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.48
+    rationale: "Account enumeration is early-stage reconnaissance."
+
+  # ============================================
+  # LATERAL MOVEMENT -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1021
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.70
+    rationale: "Remote service usage monitoring detects lateral movement."
+
+  - technique_id: T1021
+    csf:
+      function: "PROTECT"
+      category: "PR.AA"
+      subcategory: "PR.AA-5"
+    weight: 0.55
+    rationale: "Network segmentation limits lateral movement."
+
+  - technique_id: T1021.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.62
+    rationale: "RDP session monitoring for lateral movement."
+
+  - technique_id: T1021.002
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.70
+    rationale: "SMB/PsExec detection is key for lateral movement."
+
+  - technique_id: T1021.003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.68
+    rationale: "Remote WMI execution monitoring."
+
+  # ============================================
+  # COLLECTION -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1114
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.65
+    rationale: "Email collection detection through activity monitoring."
+
+  - technique_id: T1114
+    csf:
+      function: "PROTECT"
+      category: "PR.DS"
+      subcategory: "PR.DS-1"
+    weight: 0.55
+    rationale: "Data loss prevention protects email content."
+
+  - technique_id: T1114.003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.72
+    rationale: "Email forwarding rule detection is high priority."
+
+  # ============================================
+  # COMMAND AND CONTROL -> DETECT
+  # ============================================
+  - technique_id: T1071.004
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.70
+    rationale: "DNS tunneling detection through network monitoring."
+
+  - technique_id: T1071.004
+    csf:
+      function: "DETECT"
+      category: "DE.AE"
+      subcategory: "DE.AE-2"
+    weight: 0.60
+    rationale: "Anomaly detection for DNS tunneling patterns."
+
+  # ============================================
+  # ACCOUNT MANIPULATION -> GOVERN + PROTECT + DETECT
+  # ============================================
+  - technique_id: T1098
+    csf:
+      function: "GOVERN"
+      category: "GV.RM"
+      subcategory: "GV.RM-2"
+    weight: 0.55
+    rationale: "Account manipulation impacts risk management posture."
+
+  - technique_id: T1098
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.68
+    rationale: "Account changes require continuous monitoring."
+
+  - technique_id: T1098.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.65
+    rationale: "IAM policy changes in cloud require monitoring."
+
+  - technique_id: T1098.001
+    csf:
+      function: "GOVERN"
+      category: "GV.SC"
+      subcategory: "GV.SC-3"
+    weight: 0.50
+    rationale: "Cloud IAM is part of supply chain governance."
+
+  - technique_id: T1098.003
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.70
+    rationale: "OAuth application monitoring for persistence."
+
+  - technique_id: T1098.003
+    csf:
+      function: "GOVERN"
+      category: "GV.OC"
+      subcategory: "GV.OC-1"
+    weight: 0.45
+    rationale: "Third-party app governance reflects organizational context."
+
+  # ============================================
+  # INITIAL ACCESS -> PROTECT + DETECT
+  # ============================================
+  - technique_id: T1566.001
+    csf:
+      function: "PROTECT"
+      category: "PR.AT"
+      subcategory: "PR.AT-1"
+    weight: 0.60
+    rationale: "Security awareness training protects against phishing."
+
+  - technique_id: T1566.001
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.55
+    rationale: "Email security monitoring for phishing attempts."
+
+  # ============================================
+  # IMPAIR DEFENSES -> DETECT + RESPOND
+  # ============================================
+  - technique_id: T1562.007
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-6"
+    weight: 0.65
+    rationale: "Cloud security configuration monitoring."
+
+  - technique_id: T1562.007
+    csf:
+      function: "RESPOND"
+      category: "RS.AN"
+      subcategory: "RS.AN-1"
+    weight: 0.50
+    rationale: "Security configuration changes require incident analysis."
+
+  # ============================================
+  # CREDENTIAL REPLAY -> DETECT + PROTECT
+  # ============================================
+  - technique_id: T1550.001
+    csf:
+      function: "DETECT"
+      category: "DE.AE"
+      subcategory: "DE.AE-2"
+    weight: 0.62
+    rationale: "Token/session anomaly detection."
+
+  - technique_id: T1550.001
+    csf:
+      function: "PROTECT"
+      category: "PR.AA"
+      subcategory: "PR.AA-3"
+    weight: 0.55
+    rationale: "Access controls and session management."
+
+  # ============================================
+  # MFA BYPASS / AUTH MODIFICATION -> GOVERN + DETECT
+  # ============================================
+  - technique_id: T1556
+    csf:
+      function: "GOVERN"
+      category: "GV.RM"
+      subcategory: "GV.RM-3"
+    weight: 0.60
+    rationale: "Authentication policy changes impact risk posture."
+
+  - technique_id: T1556
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-1"
+    weight: 0.72
+    rationale: "Authentication configuration monitoring is critical."
+
+  - technique_id: T1556
+    csf:
+      function: "PROTECT"
+      category: "PR.AA"
+      subcategory: "PR.AA-1"
+    weight: 0.65
+    rationale: "Strong authentication controls protect against bypass."
+
+  # ============================================
+  # SIGNED BINARY PROXY EXECUTION -> DETECT
+  # ============================================
+  - technique_id: T1218.005
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.68
+    rationale: "MSHTA execution monitoring."
+
+  - technique_id: T1218.011
+    csf:
+      function: "DETECT"
+      category: "DE.CM"
+      subcategory: "DE.CM-3"
+    weight: 0.65
+    rationale: "Rundll32 abuse detection."
