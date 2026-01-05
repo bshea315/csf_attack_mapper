@@ -52,6 +52,7 @@ Thumbs.db
 *.pyc
 *.pyo
 *.pyd
+pydantic-core
 
 # Alembic
 alembic.ini.bak
