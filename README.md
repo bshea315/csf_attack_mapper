@@ -4,6 +4,7 @@ A security tool that ingests Splunk SPL detection rules, maps them to MITRE ATT&
 
 ## Features
 
+### Core Functionality
 - **SPL Ingestion**: Import detections via CSV, YAML, or direct paste
 - **SPL Parsing**: Automatic extraction of indexes, sourcetypes, datamodels, macros, commands, and thresholds
 - **MITRE ATT&CK Mapping**: Rule-based mapping with confidence scoring and evidence tracking
@@ -12,6 +13,13 @@ A security tool that ingests Splunk SPL detection rules, maps them to MITRE ATT&
 - **Gap Analysis**: Identify uncovered techniques and low-coverage CSF categories
 - **Recommendations**: Prioritized improvement suggestions based on coverage gaps
 - **Export**: CSV and JSON exports for reporting
+
+### Splunk Integration
+- **Splunk ES Sync**: Direct synchronization of correlation searches from Splunk Enterprise Security
+- **Splunk SOAR Integration**: Import playbook execution logs and action metrics
+- **SOAR Dashboard**: Visualize automation metrics, time savings, and playbook performance
+- **Playbook Management**: Track playbooks, configure time savings estimates, view run history
+- **Detection-Playbook Linking**: Associate detections with response playbooks for automation tracking
 
 ## Architecture
 
@@ -87,6 +95,34 @@ Username: admin
 Password: changeme123
 ```
 
+## Splunk Integration Setup
+
+To sync detections directly from Splunk Enterprise Security and import SOAR playbook metrics:
+
+1. Navigate to **Admin** page in the application
+2. Configure your Splunk connection:
+   - **Base URL**: Your Splunk management URL (e.g., `https://splunk.example.com:8089`)
+   - **Authentication**: Token (recommended) or Basic auth
+   - **ES App Namespace**: Usually `SplunkEnterpriseSecuritySuite`
+   - **SOAR Indexes**: Configure indexes where SOAR logs playbook runs
+
+3. Test the connection to verify credentials
+
+4. Use **Sync ES Detections** to import correlation searches
+
+5. Use **Sync SOAR Logs** to import playbook execution data
+
+### SOAR Dashboard Metrics
+
+The SOAR Dashboard displays:
+- **Total Time Saved**: Calculated from successful playbook runs × configured time savings
+- **Time Saved by Playbook**: Breakdown of automation ROI per playbook
+- **Automation Rate**: Percentage of runs completing successfully
+- **Mean Time to Respond (MTTR)**: Average playbook execution time
+- **Category Breakdown**: Runs grouped by playbook category (Investigation, Containment, etc.)
+
+Configure time savings for each playbook on the Playbook Detail page to enable ROI calculations.
+
 ## Importing Detections
 
 ### CSV Format
@@ -131,13 +167,20 @@ csf_attack_mapper/
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes/        # API endpoints
+│   │   │   ├── auth.py            # Authentication
+│   │   │   ├── detections.py      # Detection CRUD
+│   │   │   ├── ingest.py          # File upload/paste
+│   │   │   ├── analytics.py       # Coverage analytics
+│   │   │   ├── playbooks.py       # SOAR playbooks
+│   │   │   └── splunk.py          # Splunk integration
 │   │   ├── models/            # SQLAlchemy models
 │   │   ├── schemas/           # Pydantic schemas
 │   │   ├── services/          # Business logic
 │   │   │   ├── spl_parser.py      # SPL parsing
 │   │   │   ├── mitre_mapper.py    # MITRE mapping rules
 │   │   │   ├── csf_calculator.py  # CSF calculation
-│   │   │   └── coverage_analyzer.py
+│   │   │   ├── coverage_analyzer.py
+│   │   │   └── splunk_client.py   # Splunk REST client
 │   │   └── core/              # Security utilities
 │   ├── scripts/               # Init scripts
 │   └── tests/                 # Unit tests
@@ -146,11 +189,22 @@ csf_attack_mapper/
 │   │   ├── api/               # API client
 │   │   ├── components/        # React components
 │   │   ├── pages/             # Page components
+│   │   │   ├── Dashboard.tsx      # Overview stats
+│   │   │   ├── Detections.tsx     # Detection list
+│   │   │   ├── DetectionDetail.tsx
+│   │   │   ├── AttackCoverage.tsx # ATT&CK matrix
+│   │   │   ├── CsfPosture.tsx     # CSF heatmap
+│   │   │   ├── Playbooks.tsx      # SOAR playbooks
+│   │   │   ├── PlaybookDetail.tsx
+│   │   │   ├── SOARDashboard.tsx  # SOAR metrics
+│   │   │   └── Admin.tsx          # Splunk config
 │   │   └── types/             # TypeScript types
 │   └── package.json
 ├── mappings/
 │   ├── mitre_rules_starter.yml     # MITRE mapping rules
 │   └── mitre_to_csf_starter.yml    # ATT&CK→CSF crosswalk
+├── data/
+│   └── csf_attack_mapper.db        # SQLite database
 └── sample_data/
     └── sample_detections.csv       # Sample detections
 ```
@@ -183,6 +237,22 @@ csf_attack_mapper/
 - `GET /api/exports/detections.csv` - Export detections
 - `GET /api/exports/attack-coverage.csv` - Export ATT&CK coverage
 - `GET /api/exports/csf-posture.csv` - Export CSF posture
+
+### Splunk Integration
+- `GET /api/splunk/config` - Get Splunk configuration
+- `POST /api/splunk/config` - Create Splunk configuration
+- `PUT /api/splunk/config` - Update Splunk configuration
+- `POST /api/splunk/test-connection` - Test Splunk connectivity
+- `POST /api/splunk/sync/es` - Sync detections from Splunk ES
+- `POST /api/splunk/sync/soar` - Sync playbook runs from SOAR logs
+
+### Playbooks (SOAR)
+- `GET /api/playbooks` - List playbooks (paginated)
+- `GET /api/playbooks/{id}` - Get playbook details with metrics
+- `PUT /api/playbooks/{id}` - Update playbook (time savings config)
+- `POST /api/playbooks/{id}/link-detection` - Link detection to playbook
+- `DELETE /api/playbooks/{id}/link-detection/{detection_id}` - Unlink detection
+- `GET /api/playbooks/dashboard/overview` - SOAR dashboard metrics
 
 ## MITRE Mapping Rules
 
@@ -245,7 +315,7 @@ pytest
 
 ## Security Notes
 
-- JWT tokens expire after 30 minutes by default
+- JWT tokens expire after 24 hours by default
 - Passwords are hashed using bcrypt
 - Role-based access: admin, editor, viewer
 - API endpoints are protected by authentication
