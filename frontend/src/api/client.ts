@@ -140,6 +140,35 @@ export const analyticsApi = {
     const { data } = await api.get('/analytics/recommendations');
     return data;
   },
+  getTechniqueDetails: async (techniqueId: string): Promise<{
+    technique_id: string;
+    technique_name: string;
+    description: string | null;
+    tactics: string[];
+    is_subtechnique: boolean;
+    parent_technique_id: string | null;
+    url: string;
+    detection_count: number;
+    detections: Array<{
+      id: number;
+      detection_id: string;
+      name: string;
+      severity: string;
+      status: string;
+      confidence: number;
+      method: string;
+      rationale: string;
+    }>;
+    subtechniques: Array<{
+      technique_id: string;
+      technique_name: string;
+      detection_count: number;
+      url: string;
+    }>;
+  }> => {
+    const { data } = await api.get(`/analytics/technique/${techniqueId}`);
+    return data;
+  },
 };
 
 // Ingest

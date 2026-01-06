@@ -26,6 +26,9 @@ class TechniqueCoverage(BaseModel):
     tactics: List[str]
     detection_count: int
     weighted_coverage: float
+    is_subtechnique: bool = False
+    parent_technique_id: Optional[str] = None
+    url: Optional[str] = None
     detections: List[Dict[str, Any]] = []
 
 

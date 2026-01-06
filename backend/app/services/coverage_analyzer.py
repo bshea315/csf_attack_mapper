@@ -2,8 +2,8 @@
 import json
 from typing import Dict, List, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.detection import Detection
+from sqlalchemy import select, func, desc
+from app.models.detection import Detection, IngestBatch
 from app.models.spl_artifact import SplParseArtifact
 from app.models.mitre import MitreTechnique, DetectionMitreMapping
 from app.models.csf import CsfCategory, MitreToCsfMapping, DetectionCsfImpact
@@ -59,6 +59,30 @@ class CoverageAnalyzer:
         avg_score_result = await self.db.execute(avg_score_stmt)
         avg_csf_score = avg_score_result.scalar() or 0.0
 
+        # Get last ingest and recent ingests
+        last_ingest_stmt = select(IngestBatch).order_by(desc(IngestBatch.completed_at)).limit(1)
+        last_ingest_result = await self.db.execute(last_ingest_stmt)
+        last_ingest = last_ingest_result.scalar_one_or_none()
+
+        recent_ingests_stmt = select(IngestBatch).order_by(desc(IngestBatch.created_at)).limit(5)
+        recent_ingests_result = await self.db.execute(recent_ingests_stmt)
+        recent_ingests_list = recent_ingests_result.scalars().all()
+
+        recent_ingests = [
+            {
+                'id': batch.id,
+                'source_type': batch.source_type,
+                'source_filename': batch.source_filename,
+                'total_records': batch.total_records,
+                'successful': batch.successful,
+                'failed': batch.failed,
+                'status': batch.status,
+                'created_at': batch.created_at.isoformat() if batch.created_at else None,
+                'completed_at': batch.completed_at.isoformat() if batch.completed_at else None,
+            }
+            for batch in recent_ingests_list
+        ]
+
         return {
             'total_detections': total_detections,
             'enabled_detections': enabled_detections,
@@ -69,6 +93,8 @@ class CoverageAnalyzer:
             'technique_coverage_percentage': (techniques_covered / total_techniques * 100) if total_techniques > 0 else 0,
             'csf_functions_covered': csf_covered,
             'average_csf_coverage': round(avg_csf_score, 3),
+            'last_ingest_at': last_ingest.completed_at if last_ingest else None,
+            'recent_ingests': recent_ingests,
         }
 
     async def get_attack_coverage(self) -> Dict[str, Any]:
@@ -109,6 +135,8 @@ class CoverageAnalyzer:
                 'detection_count': detection_count,
                 'weighted_coverage': avg_confidence * min(detection_count, 5) / 5,  # Cap at 5 detections
                 'is_subtechnique': technique.is_subtechnique,
+                'parent_technique_id': technique.parent_technique_id,
+                'url': technique.url or f"https://attack.mitre.org/techniques/{technique.id.replace('.', '/')}",
             }
 
             for tactic in tactics:

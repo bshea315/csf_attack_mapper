@@ -122,6 +122,8 @@ export interface TechniqueCoverage {
   detection_count: number;
   weighted_coverage: number;
   is_subtechnique: boolean;
+  parent_technique_id: string | null;
+  url: string | null;
 }
 
 export interface AttackCoverageResponse {
