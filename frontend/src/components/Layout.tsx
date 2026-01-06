@@ -10,6 +10,9 @@ import {
   LogOut,
   Menu,
   X,
+  Settings,
+  Play,
+  BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -21,6 +24,9 @@ const navigation = [
   { name: 'CSF Posture', href: '/csf-posture', icon: Shield },
   { name: 'Recommendations', href: '/recommendations', icon: Lightbulb },
   { name: 'Ingest', href: '/ingest', icon: Upload },
+  { name: 'Playbooks', href: '/playbooks', icon: Play },
+  { name: 'SOAR Dashboard', href: '/soar-dashboard', icon: BarChart3 },
+  { name: 'Admin', href: '/admin', icon: Settings },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -5,6 +5,9 @@ from app.models.detection import Detection, DetectionVersion, IngestBatch
 from app.models.spl_artifact import SplParseArtifact
 from app.models.mitre import MitreTechnique, DetectionMitreMapping
 from app.models.csf import CsfCategory, MitreToCsfMapping, DetectionCsfImpact
+from app.models.splunk_config import SplunkConfig
+from app.models.playbook import Playbook
+from app.models.soar import PlaybookRun, ActionRun, DetectionPlaybookLink
 
 __all__ = [
     "Base",
@@ -22,4 +25,10 @@ __all__ = [
     "CsfCategory",
     "MitreToCsfMapping",
     "DetectionCsfImpact",
+    # Splunk ES + SOAR
+    "SplunkConfig",
+    "Playbook",
+    "PlaybookRun",
+    "ActionRun",
+    "DetectionPlaybookLink",
 ]

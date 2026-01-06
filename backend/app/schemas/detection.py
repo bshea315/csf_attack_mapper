@@ -62,6 +62,15 @@ class CsfImpactSummary(BaseModel):
     impact_score: float
 
 
+class LinkedPlaybookSummary(BaseModel):
+    """Summary of a linked playbook."""
+    id: int
+    playbook_id: str
+    name: str
+    is_active: bool
+    link_type: str
+
+
 class DetectionResponse(BaseModel):
     """Schema for detection response."""
     id: int
@@ -79,6 +88,8 @@ class DetectionResponse(BaseModel):
     spl_artifacts: Optional[SplArtifactResponse] = None
     mitre_mappings: List[MitreMappingSummary] = []
     csf_impacts: List[CsfImpactSummary] = []
+    linked_playbook_count: int = 0
+    linked_playbooks: List[LinkedPlaybookSummary] = []
 
     class Config:
         from_attributes = True

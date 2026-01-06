@@ -20,6 +20,13 @@ class Detection(Base):
     original_mitre_tags = Column(Text, nullable=True)  # JSON array from source
     data_source_notes = Column(Text, nullable=True)
     ingest_batch_id = Column(Integer, ForeignKey("ingest_batches.id"), nullable=True)
+
+    # Splunk ES integration fields
+    source_type = Column(String(20), default="manual")  # manual|csv|yaml|splunk_es
+    splunk_savedsearch_id = Column(String(255), nullable=True)  # Splunk saved search ID
+    splunk_app = Column(String(100), nullable=True)  # Splunk app namespace
+    raw_savedsearch_payload = Column(Text, nullable=True)  # JSON blob of full saved search
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -29,6 +36,7 @@ class Detection(Base):
     spl_artifacts = relationship("SplParseArtifact", back_populates="detection", uselist=False)
     mitre_mappings = relationship("DetectionMitreMapping", back_populates="detection", cascade="all, delete-orphan")
     csf_impacts = relationship("DetectionCsfImpact", back_populates="detection", cascade="all, delete-orphan")
+    playbook_links = relationship("DetectionPlaybookLink", back_populates="detection", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Detection(id={self.id}, name={self.name[:50]})>"

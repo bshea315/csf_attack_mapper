@@ -108,6 +108,9 @@ export default function Detections() {
                     MITRE Techniques
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Playbooks
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Updated
                   </th>
                 </tr>
@@ -154,6 +157,22 @@ export default function Detections() {
                       <span className="text-sm text-gray-900">
                         {detection.mitre_mappings?.length || 0} techniques
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link
+                        to={`/detections/${detection.id}`}
+                        className="text-sm"
+                      >
+                        {detection.linked_playbook_count > 0 ? (
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                            {detection.linked_playbook_count} linked
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 hover:text-blue-600">
+                            Link playbook
+                          </span>
+                        )}
+                      </Link>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {new Date(detection.updated_at).toLocaleDateString()}

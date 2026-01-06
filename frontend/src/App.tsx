@@ -10,6 +10,10 @@ import AttackCoverage from './pages/AttackCoverage';
 import CsfPosture from './pages/CsfPosture';
 import Recommendations from './pages/Recommendations';
 import Ingest from './pages/Ingest';
+import Admin from './pages/Admin';
+import Playbooks from './pages/Playbooks';
+import PlaybookDetail from './pages/PlaybookDetail';
+import SOARDashboard from './pages/SOARDashboard';
 
 interface AuthContextType {
   user: User | null;
@@ -66,6 +70,10 @@ function App() {
                   <Route path="/csf-posture" element={<CsfPosture />} />
                   <Route path="/recommendations" element={<Recommendations />} />
                   <Route path="/ingest" element={<Ingest />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/playbooks" element={<Playbooks />} />
+                  <Route path="/playbooks/:id" element={<PlaybookDetail />} />
+                  <Route path="/soar-dashboard" element={<SOARDashboard />} />
                 </Routes>
               </Layout>
             ) : (

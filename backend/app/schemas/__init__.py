@@ -33,6 +33,33 @@ from app.schemas.analytics import (
     RecommendationResponse,
     CrosswalkResponse,
 )
+from app.schemas.splunk import (
+    SplunkConfigCreate,
+    SplunkConfigUpdate,
+    SplunkConfigResponse,
+    SplunkConnectionTestResponse,
+    ESSyncResponse,
+    SOARSyncRequest,
+    SOARSyncResponse,
+)
+from app.schemas.playbook import (
+    PlaybookCreate,
+    PlaybookUpdate,
+    PlaybookResponse,
+    PlaybookListResponse,
+    PlaybookRunCreate,
+    PlaybookRunResponse,
+    PlaybookRunListResponse,
+    ActionRunCreate,
+    ActionRunResponse,
+    ActionRunListResponse,
+    DetectionPlaybookLinkCreate,
+    DetectionPlaybookLinkResponse,
+    PlaybookMetrics,
+    SOAROverviewMetrics,
+    SOARDashboardResponse,
+    PlaybookStatsResponse,
+)
 
 __all__ = [
     # User schemas
@@ -65,4 +92,29 @@ __all__ = [
     "GapAnalysisResponse",
     "RecommendationResponse",
     "CrosswalkResponse",
+    # Splunk schemas
+    "SplunkConfigCreate",
+    "SplunkConfigUpdate",
+    "SplunkConfigResponse",
+    "SplunkConnectionTestResponse",
+    "ESSyncResponse",
+    "SOARSyncRequest",
+    "SOARSyncResponse",
+    # Playbook/SOAR schemas
+    "PlaybookCreate",
+    "PlaybookUpdate",
+    "PlaybookResponse",
+    "PlaybookListResponse",
+    "PlaybookRunCreate",
+    "PlaybookRunResponse",
+    "PlaybookRunListResponse",
+    "ActionRunCreate",
+    "ActionRunResponse",
+    "ActionRunListResponse",
+    "DetectionPlaybookLinkCreate",
+    "DetectionPlaybookLinkResponse",
+    "PlaybookMetrics",
+    "SOAROverviewMetrics",
+    "SOARDashboardResponse",
+    "PlaybookStatsResponse",
 ]

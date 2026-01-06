@@ -49,6 +49,14 @@ export interface CsfImpactSummary {
   impact_score: number;
 }
 
+export interface LinkedPlaybookSummary {
+  id: number;
+  playbook_id: string;
+  name: string;
+  is_active: boolean;
+  link_type: string;
+}
+
 export interface Detection {
   id: number;
   detection_id: string;
@@ -65,6 +73,8 @@ export interface Detection {
   spl_artifacts?: SplArtifacts;
   mitre_mappings: MitreMappingSummary[];
   csf_impacts: CsfImpactSummary[];
+  linked_playbook_count: number;
+  linked_playbooks: LinkedPlaybookSummary[];
 }
 
 export interface DetectionListResponse {
@@ -252,4 +262,276 @@ export interface ReprocessResponse {
   failed: number;
   errors: string[];
   mapper_type: string;
+}
+
+// ============================================================================
+// Splunk Configuration Types
+// ============================================================================
+
+export interface SplunkConfig {
+  id: number;
+  name: string;
+  base_url: string;
+  auth_type: 'token' | 'basic';
+  verify_tls: boolean;
+  es_app_namespace: string;
+  es_owner: string;
+  soar_playbook_run_index: string;
+  soar_action_run_index: string;
+  soar_time_window_days: number;
+  has_token: boolean;
+  has_password: boolean;
+  is_active: boolean;
+  last_es_sync_at: string | null;
+  last_soar_sync_at: string | null;
+  es_detection_count: number;
+  soar_playbook_count: number;
+  soar_run_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SplunkConfigCreate {
+  name?: string;
+  base_url: string;
+  auth_type: 'token' | 'basic';
+  auth_token?: string;
+  auth_username?: string;
+  auth_password?: string;
+  verify_tls?: boolean;
+  es_app_namespace?: string;
+  es_owner?: string;
+  soar_playbook_run_index?: string;
+  soar_action_run_index?: string;
+  soar_time_window_days?: number;
+}
+
+export interface SplunkConnectionTestResponse {
+  success: boolean;
+  message: string;
+  server_info?: {
+    version: string;
+    build: string;
+    server_name: string;
+    os_name: string;
+    license_state: string;
+  };
+  error?: string;
+}
+
+export interface ESSyncResponse {
+  success: boolean;
+  total_found: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  errors: string[];
+  duration_seconds: number;
+}
+
+export interface SOARSyncRequest {
+  days: number;
+}
+
+export interface SOARSyncResponse {
+  success: boolean;
+  playbook_runs_found: number;
+  playbook_runs_created: number;
+  action_runs_found: number;
+  action_runs_created: number;
+  playbooks_discovered: number;
+  errors: string[];
+  duration_seconds: number;
+}
+
+// ============================================================================
+// Playbook and SOAR Types
+// ============================================================================
+
+export interface Playbook {
+  id: number;
+  playbook_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  category: string | null;
+  time_saved_minutes: number;
+  avg_manual_time_minutes: number | null;
+  created_at: string;
+  updated_at: string;
+  run_count: number;
+  success_rate: number | null;
+  linked_detection_count: number;
+  total_time_saved_hours: number;
+}
+
+export interface PlaybookUpdate {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+  category?: string;
+  time_saved_minutes?: number;
+  avg_manual_time_minutes?: number;
+}
+
+export interface PlaybookListResponse {
+  items: Playbook[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface PlaybookRun {
+  id: number;
+  playbook_run_id: string;
+  playbook_id: number | null;
+  playbook_name: string | null;
+  status: string;
+  start_time: string | null;
+  end_time: string | null;
+  duration_seconds: number | null;
+  container_id: string | null;
+  event_time: string | null;
+  action_count: number;
+  successful_actions: number;
+  failed_actions: number;
+  created_at: string;
+}
+
+export interface PlaybookRunListResponse {
+  items: PlaybookRun[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export interface ActionMetrics {
+  action_name: string;
+  app_name: string | null;
+  total_runs: number;
+  successful_runs: number;
+  failed_runs: number;
+  success_rate: number;
+  avg_duration_seconds: number | null;
+  common_errors?: string[];
+}
+
+export interface PlaybookMetrics {
+  playbook_id: number;
+  playbook_name: string;
+  category: string | null;
+  total_runs: number;
+  successful_runs: number;
+  failed_runs: number;
+  success_rate: number;
+  avg_duration_seconds: number | null;
+  p50_duration_seconds?: number | null;
+  p95_duration_seconds?: number | null;
+  last_run_at: string | null;
+  linked_detections: number;
+  time_saved_per_run_minutes: number;
+  total_time_saved_hours: number;
+}
+
+export interface PlaybookTimeSaved {
+  playbook_id: number;
+  playbook_name: string;
+  category: string | null;
+  successful_runs: number;
+  time_saved_per_run_minutes: number;
+  total_time_saved_minutes: number;
+  total_time_saved_hours: number;
+}
+
+export interface AppMetrics {
+  app_name: string;
+  total_actions: number;
+  successful_actions: number;
+  failed_actions: number;
+  success_rate: number;
+  unique_action_types: number;
+  avg_action_duration: number | null;
+}
+
+export interface SOAROverviewMetrics {
+  total_playbooks: number;
+  active_playbooks: number;
+  playbooks_with_time_config: number;
+  total_runs: number;
+  successful_runs: number;
+  failed_runs: number;
+  cancelled_runs: number;
+  overall_success_rate: number;
+  total_actions: number;
+  avg_actions_per_run: number;
+  unique_action_types: number;
+  unique_apps: number;
+  avg_run_duration_seconds: number | null;
+  median_run_duration_seconds: number | null;
+  runs_last_24h: number;
+  runs_last_7d: number;
+  runs_last_30d: number;
+  total_time_saved_minutes: number;
+  total_time_saved_hours: number;
+  estimated_cost_savings: number;
+  linked_detections: number;
+  unlinked_detections: number;
+  automation_coverage_percent: number;
+  mttr_minutes: number | null;
+  automation_rate: number;
+}
+
+export interface SOARDashboardResponse {
+  overview: SOAROverviewMetrics;
+  time_saved_by_playbook: PlaybookTimeSaved[];
+  top_playbooks: PlaybookMetrics[];
+  top_actions: ActionMetrics[];
+  top_apps: AppMetrics[];
+  recent_failures: PlaybookRun[];
+  time_series: Array<{
+    date: string;
+    total: number;
+    success: number;
+    failure: number;
+  }>;
+  category_breakdown: Array<{
+    category: string;
+    total_runs: number;
+    successful_runs: number;
+    failed_runs: number;
+    success_rate: number;
+  }>;
+}
+
+export interface PlaybookStatsResponse {
+  playbook: Playbook;
+  metrics: PlaybookMetrics;
+  action_breakdown: ActionMetrics[];
+  recent_runs: PlaybookRun[];
+  linked_detections: Array<{
+    id: number;
+    name: string;
+    severity: string;
+    link_type: string;
+  }>;
+}
+
+export interface DetectionPlaybookLinkCreate {
+  detection_id: number;
+  link_type?: string;
+}
+
+export interface DetectionPlaybookLink {
+  id: number;
+  detection_id: number;
+  playbook_id: number;
+  link_type: string;
+  link_evidence: string | null;
+  detection_name: string | null;
+  playbook_name: string | null;
+  created_by: number | null;
+  created_at: string;
 }

@@ -167,17 +167,21 @@ class CoverageAnalyzer:
 
     async def get_csf_coverage(self) -> Dict[str, Any]:
         """Get NIST CSF 2.0 coverage data."""
-        # First, get category-level impact data from detection_csf_impact
-        # detection_csf_impact.csf_id stores category codes like "DE.CM", "PR.AA"
+        # Get impact data from detection_csf_impact joined with csf_categories
+        # detection_csf_impact.csf_id stores subcategory IDs like "DE.CM-1", "PR.AA-1"
+        # We need to aggregate by the parent category (DE.CM, PR.AA)
         impact_stmt = select(
-            DetectionCsfImpact.csf_id,
+            CsfCategory.category,  # Parent category like "DE.CM"
+            CsfCategory.function,
             func.count(func.distinct(DetectionCsfImpact.detection_id)).label('detection_count'),
             func.avg(DetectionCsfImpact.impact_score).label('avg_score')
-        ).group_by(DetectionCsfImpact.csf_id)
+        ).select_from(DetectionCsfImpact).join(
+            CsfCategory, DetectionCsfImpact.csf_id == CsfCategory.id
+        ).group_by(CsfCategory.category, CsfCategory.function)
 
         impact_result = await self.db.execute(impact_stmt)
         impact_by_category = {
-            row[0]: {'detection_count': row[1] or 0, 'avg_score': row[2] or 0.0}
+            row[0]: {'function': row[1], 'detection_count': row[2] or 0, 'avg_score': row[3] or 0.0}
             for row in impact_result.all()
         }
 
@@ -217,6 +221,7 @@ class CoverageAnalyzer:
 
         for cat_code, cat_info in category_map.items():
             func_name = cat_info['function']
+            # Now impact_by_category is keyed by parent category (DE.CM), not subcategory (DE.CM-1)
             impact_data = impact_by_category.get(cat_code, {'detection_count': 0, 'avg_score': 0.0})
             detection_count = impact_data['detection_count']
             avg_score = impact_data['avg_score']

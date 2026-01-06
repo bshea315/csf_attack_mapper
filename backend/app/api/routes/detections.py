@@ -11,6 +11,8 @@ from app.models.detection import Detection, DetectionVersion
 from app.models.spl_artifact import SplParseArtifact
 from app.models.mitre import DetectionMitreMapping, MitreTechnique
 from app.models.csf import DetectionCsfImpact, CsfCategory
+from app.models.soar import DetectionPlaybookLink
+from app.models.playbook import Playbook
 from app.services.ingest_pipeline import IngestPipeline
 from app.schemas.detection import (
     DetectionResponse,
@@ -20,6 +22,7 @@ from app.schemas.detection import (
     SplArtifactResponse,
     MitreMappingSummary,
     CsfImpactSummary,
+    LinkedPlaybookSummary,
 )
 
 
@@ -98,6 +101,13 @@ async def list_detections(
             if not has_mitre and len(mitre_mappings) > 0:
                 continue
 
+        # Get linked playbook count
+        playbook_count_stmt = select(func.count()).select_from(
+            DetectionPlaybookLink
+        ).where(DetectionPlaybookLink.detection_id == detection.id)
+        playbook_count_result = await db.execute(playbook_count_stmt)
+        playbook_count = playbook_count_result.scalar() or 0
+
         items.append(DetectionResponse(
             id=detection.id,
             detection_id=detection.detection_id,
@@ -113,6 +123,8 @@ async def list_detections(
             updated_at=detection.updated_at,
             mitre_mappings=mitre_mappings,
             csf_impacts=[],
+            linked_playbook_count=playbook_count,
+            linked_playbooks=[],
         ))
 
     total_pages = (total + page_size - 1) // page_size
@@ -200,6 +212,25 @@ async def get_detection(
         for i in impacts
     ]
 
+    # Get linked playbooks
+    playbook_link_stmt = select(DetectionPlaybookLink, Playbook).join(
+        Playbook, DetectionPlaybookLink.playbook_id == Playbook.id
+    ).where(DetectionPlaybookLink.detection_id == detection.id)
+
+    playbook_link_result = await db.execute(playbook_link_stmt)
+    playbook_links = playbook_link_result.all()
+
+    linked_playbooks = [
+        LinkedPlaybookSummary(
+            id=p[1].id,
+            playbook_id=p[1].playbook_id,
+            name=p[1].name,
+            is_active=p[1].is_active,
+            link_type=p[0].link_type,
+        )
+        for p in playbook_links
+    ]
+
     return DetectionResponse(
         id=detection.id,
         detection_id=detection.detection_id,
@@ -216,6 +247,8 @@ async def get_detection(
         spl_artifacts=spl_artifacts,
         mitre_mappings=mitre_mappings,
         csf_impacts=csf_impacts,
+        linked_playbook_count=len(linked_playbooks),
+        linked_playbooks=linked_playbooks,
     )
 
 
@@ -346,4 +379,87 @@ async def delete_detection(
         )
 
     await db.delete(detection)
+    await db.commit()
+
+
+@router.post("/{detection_id}/playbooks/{playbook_id}", status_code=status.HTTP_201_CREATED)
+async def link_playbook_to_detection(
+    detection_id: int,
+    playbook_id: int,
+    user: User = Depends(get_editor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Link a playbook to a detection."""
+    # Verify detection exists
+    det_stmt = select(Detection).where(Detection.id == detection_id)
+    det_result = await db.execute(det_stmt)
+    detection = det_result.scalar_one_or_none()
+
+    if detection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Detection not found",
+        )
+
+    # Verify playbook exists
+    pb_stmt = select(Playbook).where(Playbook.id == playbook_id)
+    pb_result = await db.execute(pb_stmt)
+    playbook = pb_result.scalar_one_or_none()
+
+    if playbook is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Playbook not found",
+        )
+
+    # Check if link already exists
+    existing_stmt = select(DetectionPlaybookLink).where(
+        DetectionPlaybookLink.detection_id == detection_id,
+        DetectionPlaybookLink.playbook_id == playbook_id,
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing = existing_result.scalar_one_or_none()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Link already exists",
+        )
+
+    # Create link
+    link = DetectionPlaybookLink(
+        detection_id=detection_id,
+        playbook_id=playbook_id,
+        link_type="manual",
+        created_by=user.id,
+    )
+    db.add(link)
+    await db.commit()
+
+    return {"message": "Playbook linked successfully"}
+
+
+@router.delete("/{detection_id}/playbooks/{playbook_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unlink_playbook_from_detection(
+    detection_id: int,
+    playbook_id: int,
+    user: User = Depends(get_editor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unlink a playbook from a detection."""
+    # Find link
+    link_stmt = select(DetectionPlaybookLink).where(
+        DetectionPlaybookLink.detection_id == detection_id,
+        DetectionPlaybookLink.playbook_id == playbook_id,
+    )
+    link_result = await db.execute(link_stmt)
+    link = link_result.scalar_one_or_none()
+
+    if link is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found",
+        )
+
+    await db.delete(link)
     await db.commit()

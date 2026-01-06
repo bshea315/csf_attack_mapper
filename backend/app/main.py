@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api.routes import auth, ingest, detections, mappings, analytics, exports
+from app.api.routes import auth, ingest, detections, mappings, analytics, exports, splunk, playbooks
 from app.models.database import engine, Base
 
 # Create FastAPI app
@@ -31,6 +31,8 @@ app.include_router(detections.router, prefix="/api/detections", tags=["Detection
 app.include_router(mappings.router, prefix="/api/mappings", tags=["Mappings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(exports.router, prefix="/api/exports", tags=["Exports"])
+app.include_router(splunk.router, prefix="/api", tags=["Splunk"])
+app.include_router(playbooks.router, prefix="/api", tags=["Playbooks"])
 
 
 @app.on_event("startup")

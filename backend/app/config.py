@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
+    # Encryption key for Splunk secrets (must be 32 url-safe base64 chars for Fernet)
+    # In production, set this via ENCRYPTION_KEY env var
+    ENCRYPTION_KEY: str = "dev-encryption-key-32-chars-abc"  # Will be derived if not valid
+
     # Default admin user
     DEFAULT_ADMIN_USERNAME: str = "admin"
     DEFAULT_ADMIN_EMAIL: str = "admin@localhost"

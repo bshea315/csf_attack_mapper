@@ -15,6 +15,20 @@ import type {
   IngestBatch,
   ReprocessRequest,
   ReprocessResponse,
+  SplunkConfig,
+  SplunkConfigCreate,
+  SplunkConnectionTestResponse,
+  ESSyncResponse,
+  SOARSyncRequest,
+  SOARSyncResponse,
+  Playbook,
+  PlaybookUpdate,
+  PlaybookListResponse,
+  PlaybookStatsResponse,
+  PlaybookRunListResponse,
+  SOARDashboardResponse,
+  DetectionPlaybookLink,
+  DetectionPlaybookLinkCreate,
 } from '../types';
 
 const api = axios.create({
@@ -87,6 +101,12 @@ export const detectionsApi = {
   },
   delete: async (id: number): Promise<void> => {
     await api.delete(`/detections/${id}`);
+  },
+  linkPlaybook: async (detectionId: number, playbookId: number): Promise<void> => {
+    await api.post(`/detections/${detectionId}/playbooks/${playbookId}`);
+  },
+  unlinkPlaybook: async (detectionId: number, playbookId: number): Promise<void> => {
+    await api.delete(`/detections/${detectionId}/playbooks/${playbookId}`);
   },
 };
 
@@ -211,6 +231,88 @@ export const exportsApi = {
   getAttackCoverageCsv: () => `/api/exports/attack-coverage.csv`,
   getCsfPostureCsv: () => `/api/exports/csf-posture.csv`,
   getFullReportJson: () => `/api/exports/full-report.json`,
+};
+
+// Splunk Configuration
+export const splunkApi = {
+  getConfig: async (): Promise<SplunkConfig | null> => {
+    const { data } = await api.get('/splunk/config');
+    return data;
+  },
+  createConfig: async (config: SplunkConfigCreate): Promise<SplunkConfig> => {
+    const { data } = await api.post('/splunk/config', config);
+    return data;
+  },
+  updateConfig: async (updates: Partial<SplunkConfigCreate>): Promise<SplunkConfig> => {
+    const { data } = await api.put('/splunk/config', updates);
+    return data;
+  },
+  deleteConfig: async (): Promise<void> => {
+    await api.delete('/splunk/config');
+  },
+  testConnection: async (): Promise<SplunkConnectionTestResponse> => {
+    const { data } = await api.post('/splunk/test-connection');
+    return data;
+  },
+  syncES: async (): Promise<ESSyncResponse> => {
+    const { data } = await api.post('/splunk/sync/es');
+    return data;
+  },
+  syncSOAR: async (request: SOARSyncRequest): Promise<SOARSyncResponse> => {
+    const { data } = await api.post('/splunk/sync/soar', request);
+    return data;
+  },
+  autoLinkDetections: async (): Promise<{
+    success: boolean;
+    links_created: number;
+    links_skipped: number;
+    errors: string[];
+  }> => {
+    const { data } = await api.post('/splunk/sync/auto-link');
+    return data;
+  },
+};
+
+// Playbooks and SOAR
+export const playbooksApi = {
+  list: async (params: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    is_active?: boolean;
+  }): Promise<PlaybookListResponse> => {
+    const { data } = await api.get('/playbooks', { params });
+    return data;
+  },
+  get: async (id: number): Promise<PlaybookStatsResponse> => {
+    const { data } = await api.get(`/playbooks/${id}`);
+    return data;
+  },
+  update: async (id: number, update: PlaybookUpdate): Promise<Playbook> => {
+    const { data } = await api.put(`/playbooks/${id}`, update);
+    return data;
+  },
+  getRuns: async (
+    playbookId: number,
+    params: { page?: number; page_size?: number; status?: string }
+  ): Promise<PlaybookRunListResponse> => {
+    const { data } = await api.get(`/playbooks/${playbookId}/runs`, { params });
+    return data;
+  },
+  linkDetection: async (
+    playbookId: number,
+    link: DetectionPlaybookLinkCreate
+  ): Promise<DetectionPlaybookLink> => {
+    const { data } = await api.post(`/playbooks/${playbookId}/link-detection`, link);
+    return data;
+  },
+  unlinkDetection: async (playbookId: number, detectionId: number): Promise<void> => {
+    await api.delete(`/playbooks/${playbookId}/link-detection/${detectionId}`);
+  },
+  getDashboard: async (): Promise<SOARDashboardResponse> => {
+    const { data } = await api.get('/playbooks/dashboard/overview');
+    return data;
+  },
 };
 
 export default api;

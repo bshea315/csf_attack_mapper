@@ -12,6 +12,7 @@ greenlet>=3.1.0
 # Authentication
 python-jose[cryptography]>=3.3.0
 bcrypt>=4.2.0
+cryptography>=42.0.0
 
 # Data validation (Python 3.13 compatible)
 pydantic>=2.10.0

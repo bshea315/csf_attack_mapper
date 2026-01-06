@@ -1,19 +1,53 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { detectionsApi } from '../api/client';
-import { ArrowLeft, Copy, Check, CheckCircle, XCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { detectionsApi, playbooksApi } from '../api/client';
+import { ArrowLeft, Copy, Check, CheckCircle, XCircle, Plus, X, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
+import type { Playbook } from '../types';
 
 export default function DetectionDetail() {
   const { id } = useParams<{ id: string }>();
   const [copied, setCopied] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [playbookSearch, setPlaybookSearch] = useState('');
+  const queryClient = useQueryClient();
 
   const { data: detection, isLoading } = useQuery({
     queryKey: ['detection', id],
     queryFn: () => detectionsApi.get(Number(id)),
     enabled: !!id,
   });
+
+  // Get all playbooks for linking
+  const { data: playbooksData } = useQuery({
+    queryKey: ['playbooks', 'all'],
+    queryFn: () => playbooksApi.list({ page: 1, page_size: 100 }),
+    enabled: showLinkModal,
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: (playbookId: number) => detectionsApi.linkPlaybook(Number(id), playbookId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['detection', id] });
+      setShowLinkModal(false);
+    },
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (playbookId: number) => detectionsApi.unlinkPlaybook(Number(id), playbookId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['detection', id] });
+    },
+  });
+
+  // Filter playbooks not already linked
+  const availablePlaybooks = playbooksData?.items.filter(
+    (pb: Playbook) => !detection?.linked_playbooks.some((lp) => lp.id === pb.id)
+  ).filter(
+    (pb: Playbook) => pb.name.toLowerCase().includes(playbookSearch.toLowerCase()) ||
+      pb.playbook_id.toLowerCase().includes(playbookSearch.toLowerCase())
+  ) || [];
 
   const copyToClipboard = async () => {
     if (detection?.spl) {
@@ -219,6 +253,125 @@ export default function DetectionDetail() {
           </div>
         )}
       </div>
+
+      {/* Linked Playbooks */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Linked SOAR Playbooks</h2>
+          <button
+            onClick={() => setShowLinkModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+          >
+            <Plus className="h-4 w-4" />
+            Link Playbook
+          </button>
+        </div>
+        {detection.linked_playbooks.length === 0 ? (
+          <p className="text-gray-500">No playbooks linked to this detection.</p>
+        ) : (
+          <div className="space-y-3">
+            {detection.linked_playbooks.map((playbook) => (
+              <div
+                key={playbook.id}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    'w-2 h-2 rounded-full',
+                    playbook.is_active ? 'bg-green-500' : 'bg-gray-400'
+                  )} />
+                  <div>
+                    <Link
+                      to={`/playbooks/${playbook.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {playbook.name}
+                    </Link>
+                    <p className="text-sm text-gray-500">
+                      {playbook.playbook_id} | Link: {playbook.link_type}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => unlinkMutation.mutate(playbook.id)}
+                  disabled={unlinkMutation.isPending}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded"
+                  title="Unlink playbook"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Link Playbook Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold">Link Playbook</h3>
+              <button
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setPlaybookSearch('');
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search playbooks..."
+                  value={playbookSearch}
+                  onChange={(e) => setPlaybookSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {availablePlaybooks.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">
+                    {playbookSearch ? 'No matching playbooks found.' : 'No playbooks available to link.'}
+                  </p>
+                ) : (
+                  availablePlaybooks.map((playbook: Playbook) => (
+                    <button
+                      key={playbook.id}
+                      onClick={() => linkMutation.mutate(playbook.id)}
+                      disabled={linkMutation.isPending}
+                      className="w-full text-left p-3 hover:bg-purple-50 rounded-lg border border-gray-200 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{playbook.name}</span>
+                        {playbook.is_active ? (
+                          <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded-full">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500">{playbook.playbook_id}</p>
+                      {playbook.category && (
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                          {playbook.category}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
