@@ -13,6 +13,8 @@ import type {
   GapAnalysisResponse,
   RecommendationResponse,
   IngestBatch,
+  ReprocessRequest,
+  ReprocessResponse,
 } from '../types';
 
 const api = axios.create({
@@ -195,6 +197,10 @@ export const ingestApi = {
   },
   getBatches: async (): Promise<IngestBatch[]> => {
     const { data } = await api.get('/ingest/batches');
+    return data;
+  },
+  reprocessMappings: async (request: ReprocessRequest): Promise<ReprocessResponse> => {
+    const { data } = await api.post('/ingest/reprocess', request);
     return data;
   },
 };

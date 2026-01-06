@@ -48,8 +48,8 @@ interface TechniqueDetail {
   detection_count: number;
   tactic: string;
   is_subtechnique?: boolean;
-  parent_technique_id?: string;
-  url?: string;
+  parent_technique_id?: string | null;
+  url?: string | null;
 }
 
 interface TechniqueModalData {
@@ -200,17 +200,17 @@ export default function AttackCoverage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ATT&CK Coverage Matrix</h1>
-          <p className="text-gray-600">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">ATT&CK Coverage Matrix</h1>
+          <p className="text-sm sm:text-base text-gray-600">
             {data.covered_techniques} of {data.total_techniques} techniques covered ({data.coverage_percentage.toFixed(1)}%)
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-xs sm:text-sm text-gray-500">
             {parentTechniqueCount} parent techniques, {subTechniqueCount} sub-techniques
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input
               type="checkbox"
@@ -218,36 +218,37 @@ export default function AttackCoverage() {
               onChange={(e) => setShowSubtechniques(e.target.checked)}
               className="rounded border-gray-300"
             />
-            Show sub-techniques
+            <span className="hidden sm:inline">Show sub-techniques</span>
+            <span className="sm:hidden">Subs</span>
           </label>
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('heatmap')}
               className={clsx(
-                'px-3 py-1 rounded text-sm font-medium transition-colors',
+                'px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors',
                 viewMode === 'heatmap' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
               )}
             >
-              <Grid3X3 className="h-4 w-4 inline mr-1" />
-              Matrix
+              <Grid3X3 className="h-4 w-4 inline sm:mr-1" />
+              <span className="hidden sm:inline">Matrix</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={clsx(
-                'px-3 py-1 rounded text-sm font-medium transition-colors',
+                'px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors',
                 viewMode === 'list' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
               )}
             >
-              <List className="h-4 w-4 inline mr-1" />
-              List
+              <List className="h-4 w-4 inline sm:mr-1" />
+              <span className="hidden sm:inline">List</span>
             </button>
           </div>
           <a
             href={exportsApi.getAttackCoverageCsv()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
           >
             <Download className="h-4 w-4" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </a>
         </div>
       </div>
@@ -271,23 +272,24 @@ export default function AttackCoverage() {
       </div>
 
       {/* Legend */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-gray-700">Detection Count:</span>
+      <div className="bg-white rounded-lg shadow p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Detection Count:</span>
             <div className="flex items-center gap-1">
-              <div className="w-6 h-6 bg-gray-200 rounded" title="0 detections" />
-              <div className="w-6 h-6 bg-red-300 rounded" title="1 detection" />
-              <div className="w-6 h-6 bg-orange-300 rounded" title="2-3 detections" />
-              <div className="w-6 h-6 bg-yellow-300 rounded" title="4-5 detections" />
-              <div className="w-6 h-6 bg-lime-400 rounded" title="6+ detections" />
-              <div className="w-6 h-6 bg-green-500 rounded" title="High coverage" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-200 rounded" title="0 detections" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-red-300 rounded" title="1 detection" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-orange-300 rounded" title="2-3 detections" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-yellow-300 rounded" title="4-5 detections" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-lime-400 rounded" title="6+ detections" />
+              <div className="w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded" title="High coverage" />
             </div>
             <span className="text-xs text-gray-500">0 → {maxDetectionCount}+</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Info className="h-4 w-4" />
-            <span>Click technique for details and detections</span>
+            <Info className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Click technique for details and detections</span>
+            <span className="sm:hidden">Tap for details</span>
           </div>
         </div>
       </div>
@@ -430,7 +432,7 @@ export default function AttackCoverage() {
                 <div className="flex items-center gap-2">
                   {(hoveredTechnique || selectedTechnique)?.url && (
                     <a
-                      href={(hoveredTechnique || selectedTechnique)?.url}
+                      href={(hoveredTechnique || selectedTechnique)?.url || undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm"
@@ -469,7 +471,7 @@ export default function AttackCoverage() {
                       {tech.detection_count} detections
                     </span>
                     <a
-                      href={tech.url}
+                      href={tech.url || undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-gray-400 hover:text-blue-600"
@@ -513,26 +515,26 @@ export default function AttackCoverage() {
       )}
 
       {/* Tactic Summary Cards */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Coverage by Tactic</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Coverage by Tactic</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
           {tacticStats.map(({ tactic, covered, total, percentage, totalDetections }) => (
             <div
               key={tactic}
-              className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+              className="p-2 sm:p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
             >
-              <div className="text-xs font-medium text-gray-500 uppercase truncate" title={tactic}>
+              <div className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase truncate" title={tactic}>
                 {tactic.replace(/-/g, ' ')}
               </div>
               <div className="mt-1 flex items-end justify-between">
-                <span className="text-2xl font-bold text-gray-900">
+                <span className="text-lg sm:text-2xl font-bold text-gray-900">
                   {percentage.toFixed(0)}%
                 </span>
-                <span className="text-xs text-gray-500">
+                <span className="text-[10px] sm:text-xs text-gray-500">
                   {covered}/{total}
                 </span>
               </div>
-              <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="mt-2 h-1 sm:h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className={clsx(
                     'h-full rounded-full transition-all',
@@ -543,7 +545,7 @@ export default function AttackCoverage() {
                   style={{ width: `${percentage}%` }}
                 />
               </div>
-              <div className="mt-1 text-xs text-gray-400">
+              <div className="mt-1 text-[10px] sm:text-xs text-gray-400">
                 {totalDetections} detection{totalDetections !== 1 ? 's' : ''}
               </div>
             </div>

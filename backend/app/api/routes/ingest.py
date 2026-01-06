@@ -3,12 +3,28 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import BaseModel
 
-from app.api.deps import get_db, get_current_user_required, get_editor_user
+from app.api.deps import get_db, get_current_user_required, get_editor_user, get_admin_user
 from app.models.user import User
 from app.models.detection import IngestBatch
 from app.services.ingest_pipeline import IngestPipeline
 from app.schemas.detection import IngestBatchResponse, IngestPasteRequest
+
+
+class ReprocessRequest(BaseModel):
+    """Request body for reprocessing mappings."""
+    use_enhanced_mapper: bool = True
+    confirmation: str  # Must be "REPROCESS" to confirm
+
+
+class ReprocessResponse(BaseModel):
+    """Response for reprocessing operation."""
+    total_detections: int
+    successful: int
+    failed: int
+    errors: List[str]
+    mapper_type: str
 
 
 router = APIRouter()
@@ -200,4 +216,44 @@ async def get_batch(
         error_message=batch.error_message,
         created_at=batch.created_at,
         completed_at=batch.completed_at,
+    )
+
+
+@router.post("/reprocess", response_model=ReprocessResponse)
+async def reprocess_all_mappings(
+    request: ReprocessRequest,
+    user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Re-process MITRE mappings for all detections.
+
+    This is a destructive operation that clears all existing MITRE mappings
+    and CSF impacts, then re-runs the mapper on all detections.
+
+    Requires:
+    - Admin role
+    - Confirmation string must be exactly "REPROCESS"
+
+    Use cases:
+    - Switching from legacy to enhanced mapper
+    - After updating technique indicators
+    - Fixing mapping issues across all detections
+    """
+    # Verify confirmation
+    if request.confirmation != "REPROCESS":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation must be exactly 'REPROCESS' to proceed",
+        )
+
+    pipeline = IngestPipeline(db, use_enhanced_mapper=request.use_enhanced_mapper)
+    result = await pipeline.reprocess_all_mappings(user_id=user.id)
+
+    return ReprocessResponse(
+        total_detections=result['total_detections'],
+        successful=result['successful'],
+        failed=result['failed'],
+        errors=result['errors'],
+        mapper_type=result['mapper_type'],
     )

@@ -1,0 +1,1354 @@
+# Technique Indicators Database for Enhanced MITRE Mapping
+# This file provides deterministic, multi-signal indicators for MITRE techniques
+#
+# Signal Weights:
+#   - data_sources: 0.25 (indexes, sourcetypes, datamodels)
+#   - field_indicators: 0.30 (fields referenced in SPL)
+#   - behavioral_patterns: 0.35 (regex patterns in SPL)
+#   - tag_confirmation: 0.10 (original MITRE tags)
+
+version: "2.0"
+description: "Deterministic technique indicators for SPL-based MITRE mapping"
+
+# Confidence thresholds
+thresholds:
+  high: 0.70      # Auto-accept
+  medium: 0.45    # Accept with review flag
+  low: 0.25       # Suggest for review
+  none: 0.0       # Don't map
+
+# Tactic criticality weights (for recommendation scoring)
+tactic_criticality:
+  initial-access: 1.0
+  execution: 0.95
+  persistence: 0.90
+  privilege-escalation: 0.90
+  defense-evasion: 0.85
+  credential-access: 0.85
+  lateral-movement: 0.80
+  exfiltration: 0.80
+  command-and-control: 0.75
+  impact: 0.75
+  collection: 0.70
+  reconnaissance: 0.60
+  discovery: 0.50
+  resource-development: 0.40
+
+indicators:
+  # ============================================
+  # EXECUTION
+  # ============================================
+  T1059.001:
+    name: "PowerShell"
+    tactic: "execution"
+    description: "Adversaries may abuse PowerShell commands and scripts for execution"
+
+    data_sources:
+      strong:
+        indexes: ["wineventlog", "windows", "main"]
+        sourcetypes:
+          - "WinEventLog:Microsoft-Windows-PowerShell/Operational"
+          - "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational"
+          - "powershell"
+          - "powershell:scriptblock"
+        datamodels: ["Endpoint"]
+      moderate:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "sysmon"
+          - "WinEventLog:Security"
+
+    field_indicators:
+      strong:
+        - "ScriptBlockText"
+        - "CommandLine"
+        - "command_line"
+        - "process_name"
+        - "HostApplication"
+      moderate:
+        - "ParentCommandLine"
+        - "parent_process"
+        - "User"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)powershell.*-enc[odedcommand]*\\s"
+        weight: 0.95
+        description: "Encoded PowerShell command"
+      - pattern: "(?i)powershell.*-nop.*-w\\s*hidden"
+        weight: 0.92
+        description: "Hidden window, no profile"
+      - pattern: "(?i)powershell.*downloadstring"
+        weight: 0.88
+        description: "Remote download via DownloadString"
+      - pattern: "(?i)invoke-webrequest|iwr\\s"
+        weight: 0.85
+        description: "Web request invocation"
+      - pattern: "(?i)invoke-expression|iex\\s*\\("
+        weight: 0.80
+        description: "Dynamic code execution"
+      - pattern: "(?i)-exec.*bypass"
+        weight: 0.78
+        description: "Execution policy bypass"
+      - pattern: "(?i)New-Object.*Net\\.WebClient"
+        weight: 0.82
+        description: "WebClient object creation"
+      - pattern: "(?i)powershell\\.exe"
+        weight: 0.45
+        description: "Basic PowerShell execution"
+      - pattern: "(?i)pwsh\\.exe"
+        weight: 0.45
+        description: "PowerShell Core execution"
+
+    event_ids:
+      strong: [4103, 4104]  # Module/Script block logging
+      moderate: [4688]       # Process creation
+
+  T1059.003:
+    name: "Windows Command Shell"
+    tactic: "execution"
+    description: "Adversaries may abuse the Windows command shell (cmd.exe) for execution"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+      moderate:
+        sourcetypes:
+          - "sysmon"
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "command_line"
+        - "process_name"
+        - "Image"
+      moderate:
+        - "ParentImage"
+        - "parent_process"
+
+    behavioral_patterns:
+      - pattern: "(?i)cmd\\.exe.*/c\\s"
+        weight: 0.70
+        description: "CMD with /c flag"
+      - pattern: "(?i)cmd\\.exe.*/k\\s"
+        weight: 0.65
+        description: "CMD with /k flag"
+      - pattern: "(?i)cmd\\.exe.*&&"
+        weight: 0.60
+        description: "Chained commands"
+      - pattern: "(?i)cmd\\.exe"
+        weight: 0.40
+        description: "Basic CMD execution"
+
+    event_ids:
+      strong: [4688, 1]
+
+  T1047:
+    name: "Windows Management Instrumentation"
+    tactic: "execution"
+    description: "Adversaries may abuse WMI to execute malicious commands and payloads"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Microsoft-Windows-WMI-Activity/Operational"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+      moderate:
+        sourcetypes:
+          - "WinEventLog:Security"
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "process_name"
+        - "WmiPrvSE"
+      moderate:
+        - "dest"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)wmic\\s+process\\s+call\\s+create"
+        weight: 0.92
+        description: "WMI process creation"
+      - pattern: "(?i)wmic.*/node:"
+        weight: 0.88
+        description: "Remote WMI execution"
+      - pattern: "(?i)Win32_Process.*Create"
+        weight: 0.85
+        description: "Win32_Process Create method"
+      - pattern: "(?i)wmiprvse\\.exe"
+        weight: 0.65
+        description: "WMI provider host"
+      - pattern: "(?i)wmic"
+        weight: 0.50
+        description: "Basic WMIC usage"
+
+    event_ids:
+      strong: [5857, 5858, 5859, 5860, 5861]
+      moderate: [4688]
+
+  T1053.005:
+    name: "Scheduled Task"
+    tactic: "persistence"
+    description: "Adversaries may abuse the Windows Task Scheduler to execute malicious code"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "WinEventLog:Microsoft-Windows-TaskScheduler/Operational"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "TaskName"
+        - "Command"
+        - "CommandLine"
+      moderate:
+        - "User"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)schtasks.*/create"
+        weight: 0.90
+        description: "Scheduled task creation"
+      - pattern: "(?i)schtasks.*/run"
+        weight: 0.75
+        description: "Scheduled task execution"
+      - pattern: "(?i)schtasks.*/change"
+        weight: 0.80
+        description: "Scheduled task modification"
+      - pattern: "(?i)Register-ScheduledTask"
+        weight: 0.85
+        description: "PowerShell task registration"
+      - pattern: "(?i)TaskScheduler"
+        weight: 0.55
+        description: "Task Scheduler reference"
+
+    event_ids:
+      strong: [4698, 4699, 4700, 4701, 4702]
+      moderate: [106, 200, 201]
+
+  # ============================================
+  # CREDENTIAL ACCESS
+  # ============================================
+  T1003.001:
+    name: "LSASS Memory"
+    tactic: "credential-access"
+    description: "Adversaries may attempt to access credential material stored in LSASS"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "sysmon"
+        datamodels: ["Endpoint"]
+      moderate:
+        sourcetypes:
+          - "WinEventLog:Security"
+
+    field_indicators:
+      strong:
+        - "TargetImage"
+        - "SourceImage"
+        - "CallTrace"
+        - "GrantedAccess"
+      moderate:
+        - "process_name"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)lsass\\.exe"
+        weight: 0.85
+        description: "LSASS process reference"
+      - pattern: "(?i)mimikatz"
+        weight: 0.98
+        description: "Mimikatz tool reference"
+      - pattern: "(?i)sekurlsa"
+        weight: 0.95
+        description: "Sekurlsa module reference"
+      - pattern: "(?i)procdump.*lsass"
+        weight: 0.92
+        description: "Process dump of LSASS"
+      - pattern: "(?i)comsvcs\\.dll.*MiniDump"
+        weight: 0.90
+        description: "MiniDump via comsvcs"
+      - pattern: "(?i)GrantedAccess.*(0x1010|0x1FFFFF)"
+        weight: 0.88
+        description: "Suspicious LSASS access rights"
+      - pattern: "(?i)credential.*dump"
+        weight: 0.70
+        description: "Credential dump reference"
+
+    event_ids:
+      strong: [10]  # Sysmon ProcessAccess
+      moderate: [4688, 4663]
+
+  T1003.002:
+    name: "Security Account Manager"
+    tactic: "credential-access"
+    description: "Adversaries may attempt to extract credential material from the SAM database"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "WinEventLog:Security"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "TargetFilename"
+        - "CommandLine"
+        - "ObjectName"
+      moderate:
+        - "process_name"
+
+    behavioral_patterns:
+      - pattern: "(?i)reg\\s+save\\s+HKLM\\\\SAM"
+        weight: 0.95
+        description: "SAM registry export"
+      - pattern: "(?i)reg\\s+save\\s+HKLM\\\\SYSTEM"
+        weight: 0.90
+        description: "SYSTEM registry export"
+      - pattern: "(?i)ntdsutil"
+        weight: 0.88
+        description: "NTDS utility usage"
+      - pattern: "(?i)secretsdump"
+        weight: 0.95
+        description: "SecretsDump tool"
+      - pattern: "(?i)shadow.*copy"
+        weight: 0.75
+        description: "Shadow copy access"
+      - pattern: "(?i)vssadmin.*create.*shadow"
+        weight: 0.80
+        description: "VSS shadow creation"
+
+    event_ids:
+      strong: [4663]
+      moderate: [4688]
+
+  T1110:
+    name: "Brute Force"
+    tactic: "credential-access"
+    description: "Adversaries may use brute force techniques to gain access to accounts"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Security"
+          - "azure:aad:signin"
+          - "o365:management:activity"
+        datamodels: ["Authentication"]
+      moderate:
+        sourcetypes:
+          - "linux_secure"
+          - "syslog"
+
+    field_indicators:
+      strong:
+        - "FailureReason"
+        - "LogonType"
+        - "Status"
+        - "SubStatus"
+        - "failure_count"
+      moderate:
+        - "user"
+        - "src"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)EventCode\\s*=\\s*4625"
+        weight: 0.85
+        description: "Windows failed logon events"
+      - pattern: "(?i)password.*spray"
+        weight: 0.90
+        description: "Password spray reference"
+      - pattern: "(?i)brute.*force"
+        weight: 0.88
+        description: "Brute force reference"
+      - pattern: "(?i)multiple.*failed.*logon"
+        weight: 0.80
+        description: "Multiple failed logon reference"
+      - pattern: "(?i)account.*lockout"
+        weight: 0.75
+        description: "Account lockout reference"
+      - pattern: "(?i)stats.*count.*by.*user"
+        weight: 0.60
+        description: "User-based counting pattern"
+
+    event_ids:
+      strong: [4625, 4771, 4776]
+      moderate: [4624]
+
+  T1558.003:
+    name: "Kerberoasting"
+    tactic: "credential-access"
+    description: "Adversaries may abuse Kerberos to steal service account credentials"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Security"
+
+    field_indicators:
+      strong:
+        - "ServiceName"
+        - "TicketEncryptionType"
+        - "TicketOptions"
+      moderate:
+        - "user"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)kerberoast"
+        weight: 0.95
+        description: "Kerberoasting reference"
+      - pattern: "(?i)EventCode\\s*=\\s*4769"
+        weight: 0.80
+        description: "TGS request event"
+      - pattern: "(?i)TicketEncryptionType.*(0x17|23)"
+        weight: 0.90
+        description: "RC4 encryption type"
+      - pattern: "(?i)Invoke-Kerberoast"
+        weight: 0.98
+        description: "Kerberoast PowerShell"
+      - pattern: "(?i)GetUserSPNs"
+        weight: 0.92
+        description: "SPN enumeration"
+
+    event_ids:
+      strong: [4769]
+
+  # ============================================
+  # PERSISTENCE
+  # ============================================
+  T1547.001:
+    name: "Registry Run Keys / Startup Folder"
+    tactic: "persistence"
+    description: "Adversaries may achieve persistence using registry run keys or startup folder"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "sysmon"
+          - "WinEventLog:Security"
+        datamodels: ["Endpoint", "Change"]
+
+    field_indicators:
+      strong:
+        - "TargetObject"
+        - "registry_path"
+        - "registry_value_name"
+        - "Details"
+      moderate:
+        - "process_name"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)\\\\CurrentVersion\\\\Run\\b"
+        weight: 0.90
+        description: "Run key path"
+      - pattern: "(?i)\\\\CurrentVersion\\\\RunOnce"
+        weight: 0.88
+        description: "RunOnce key path"
+      - pattern: "(?i)\\\\Startup\\\\"
+        weight: 0.85
+        description: "Startup folder path"
+      - pattern: "(?i)HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run"
+        weight: 0.92
+        description: "Full Run key path"
+      - pattern: "(?i)registry.*persistence"
+        weight: 0.70
+        description: "Registry persistence reference"
+
+    event_ids:
+      strong: [13]  # Sysmon RegistryEvent
+      moderate: [4657]
+
+  T1543.003:
+    name: "Windows Service"
+    tactic: "persistence"
+    description: "Adversaries may create or modify Windows services to maintain persistence"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:System"
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint", "Change"]
+
+    field_indicators:
+      strong:
+        - "ServiceName"
+        - "ImagePath"
+        - "ServiceType"
+        - "StartType"
+      moderate:
+        - "user"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)sc\\s+create"
+        weight: 0.90
+        description: "Service creation command"
+      - pattern: "(?i)New-Service"
+        weight: 0.88
+        description: "PowerShell service creation"
+      - pattern: "(?i)EventCode\\s*=\\s*(7045|4697)"
+        weight: 0.85
+        description: "Service installation event"
+      - pattern: "(?i)services\\.exe"
+        weight: 0.50
+        description: "Services process"
+
+    event_ids:
+      strong: [7045, 4697]
+      moderate: [7034, 7036]
+
+  # ============================================
+  # PRIVILEGE ESCALATION
+  # ============================================
+  T1548.002:
+    name: "Bypass User Account Control"
+    tactic: "privilege-escalation"
+    description: "Adversaries may bypass UAC mechanisms to elevate privileges"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "sysmon"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "Image"
+        - "CommandLine"
+        - "IntegrityLevel"
+      moderate:
+        - "ParentImage"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)fodhelper\\.exe"
+        weight: 0.92
+        description: "Fodhelper UAC bypass"
+      - pattern: "(?i)eventvwr\\.exe"
+        weight: 0.85
+        description: "Event Viewer UAC bypass"
+      - pattern: "(?i)sdclt\\.exe"
+        weight: 0.88
+        description: "Sdclt UAC bypass"
+      - pattern: "(?i)computerdefaults\\.exe"
+        weight: 0.85
+        description: "ComputerDefaults UAC bypass"
+      - pattern: "(?i)uac.*bypass"
+        weight: 0.90
+        description: "UAC bypass reference"
+      - pattern: "(?i)Invoke-BypassUAC"
+        weight: 0.95
+        description: "PowerShell UAC bypass"
+
+    event_ids:
+      moderate: [4688, 1]
+
+  # ============================================
+  # DEFENSE EVASION
+  # ============================================
+  T1070.001:
+    name: "Clear Windows Event Logs"
+    tactic: "defense-evasion"
+    description: "Adversaries may clear Windows Event Logs to hide evidence"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "WinEventLog:System"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+
+    field_indicators:
+      strong:
+        - "SubjectUserName"
+        - "Channel"
+      moderate:
+        - "user"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)wevtutil\\s+cl"
+        weight: 0.95
+        description: "Event log clear command"
+      - pattern: "(?i)Clear-EventLog"
+        weight: 0.92
+        description: "PowerShell event log clear"
+      - pattern: "(?i)EventCode\\s*=\\s*(1102|104)"
+        weight: 0.90
+        description: "Log cleared event"
+      - pattern: "(?i)event.*log.*clear"
+        weight: 0.80
+        description: "Log clearing reference"
+
+    event_ids:
+      strong: [1102, 104]
+
+  T1562.001:
+    name: "Disable or Modify Tools"
+    tactic: "defense-evasion"
+    description: "Adversaries may disable security tools to avoid detection"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Microsoft-Windows-Windows Defender/Operational"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "NewValue"
+        - "TargetObject"
+      moderate:
+        - "process_name"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)Set-MpPreference.*-Disable"
+        weight: 0.95
+        description: "Defender preference disable"
+      - pattern: "(?i)DisableRealtimeMonitoring"
+        weight: 0.92
+        description: "Real-time monitoring disable"
+      - pattern: "(?i)DisableBehaviorMonitoring"
+        weight: 0.90
+        description: "Behavior monitoring disable"
+      - pattern: "(?i)sc\\s+stop\\s+WinDefend"
+        weight: 0.90
+        description: "Stop Defender service"
+      - pattern: "(?i)tamper.*protection"
+        weight: 0.85
+        description: "Tamper protection reference"
+      - pattern: "(?i)AMSI.*bypass"
+        weight: 0.88
+        description: "AMSI bypass reference"
+
+    event_ids:
+      moderate: [5001, 5007]
+
+  T1055:
+    name: "Process Injection"
+    tactic: "defense-evasion"
+    description: "Adversaries may inject code into processes to evade defenses"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "sysmon"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "SourceImage"
+        - "TargetImage"
+        - "CallTrace"
+        - "GrantedAccess"
+      moderate:
+        - "process_name"
+
+    behavioral_patterns:
+      - pattern: "(?i)CreateRemoteThread"
+        weight: 0.92
+        description: "Remote thread creation"
+      - pattern: "(?i)WriteProcessMemory"
+        weight: 0.88
+        description: "Process memory write"
+      - pattern: "(?i)VirtualAllocEx"
+        weight: 0.85
+        description: "Remote memory allocation"
+      - pattern: "(?i)NtQueueApcThread"
+        weight: 0.90
+        description: "APC queue injection"
+      - pattern: "(?i)process.*injection"
+        weight: 0.75
+        description: "Process injection reference"
+
+    event_ids:
+      strong: [8, 10]  # Sysmon CreateRemoteThread, ProcessAccess
+      moderate: [1]
+
+  T1027:
+    name: "Obfuscated Files or Information"
+    tactic: "defense-evasion"
+    description: "Adversaries may obfuscate content to make it difficult to analyze"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "WinEventLog:Microsoft-Windows-PowerShell/Operational"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "ScriptBlockText"
+      moderate:
+        - "process_name"
+
+    behavioral_patterns:
+      - pattern: "(?i)-enc[odedcommand]*\\s"
+        weight: 0.90
+        description: "Encoded command"
+      - pattern: "(?i)FromBase64String"
+        weight: 0.85
+        description: "Base64 decode"
+      - pattern: "(?i)certutil.*-decode"
+        weight: 0.88
+        description: "Certutil decode"
+      - pattern: "(?i)\\[Convert\\]::FromBase64"
+        weight: 0.85
+        description: "PowerShell base64 decode"
+      - pattern: "(?i)obfuscat"
+        weight: 0.70
+        description: "Obfuscation reference"
+      - pattern: "(?i)\\^.*\\^.*\\^"
+        weight: 0.75
+        description: "Caret obfuscation pattern"
+
+    event_ids:
+      strong: [4104]
+
+  # ============================================
+  # LATERAL MOVEMENT
+  # ============================================
+  T1021.001:
+    name: "Remote Desktop Protocol"
+    tactic: "lateral-movement"
+    description: "Adversaries may use RDP for lateral movement"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "WinEventLog:Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"
+        datamodels: ["Authentication", "Network_Traffic"]
+
+    field_indicators:
+      strong:
+        - "LogonType"
+        - "SourceNetworkAddress"
+        - "SessionName"
+      moderate:
+        - "user"
+        - "src"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)LogonType\\s*=\\s*10"
+        weight: 0.90
+        description: "RDP logon type"
+      - pattern: "(?i)mstsc\\.exe"
+        weight: 0.75
+        description: "RDP client"
+      - pattern: "(?i)Remote.*Desktop"
+        weight: 0.65
+        description: "Remote Desktop reference"
+      - pattern: "(?i)TermService"
+        weight: 0.70
+        description: "Terminal Service"
+      - pattern: "(?i)dest_port\\s*=\\s*3389"
+        weight: 0.80
+        description: "RDP port"
+
+    event_ids:
+      strong: [4624, 4778, 4779]
+      moderate: [21, 22, 23, 24, 25]
+
+  T1021.002:
+    name: "SMB/Windows Admin Shares"
+    tactic: "lateral-movement"
+    description: "Adversaries may use SMB admin shares for lateral movement"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Network_Traffic", "Endpoint"]
+
+    field_indicators:
+      strong:
+        - "ShareName"
+        - "RelativeTargetName"
+        - "SubjectUserName"
+      moderate:
+        - "src"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)\\\\\\\\.*\\\\(ADMIN|C|IPC)\\$"
+        weight: 0.90
+        description: "Admin share access"
+      - pattern: "(?i)psexec"
+        weight: 0.92
+        description: "PsExec tool"
+      - pattern: "(?i)PSEXESVC"
+        weight: 0.90
+        description: "PsExec service"
+      - pattern: "(?i)net\\s+use.*\\$"
+        weight: 0.80
+        description: "Net use to admin share"
+      - pattern: "(?i)EventCode\\s*=\\s*5145"
+        weight: 0.75
+        description: "Share access event"
+
+    event_ids:
+      strong: [5140, 5145]
+      moderate: [4624]
+
+  T1021.003:
+    name: "Distributed Component Object Model"
+    tactic: "lateral-movement"
+    description: "Adversaries may use DCOM for lateral movement"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          - "WinEventLog:Security"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "Image"
+        - "ParentImage"
+      moderate:
+        - "dest"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)wmiexec"
+        weight: 0.92
+        description: "WMIExec tool"
+      - pattern: "(?i)dcomexec"
+        weight: 0.90
+        description: "DCOMExec tool"
+      - pattern: "(?i)mmc\\.exe.*-Embedding"
+        weight: 0.85
+        description: "MMC DCOM embedding"
+      - pattern: "(?i)ShellBrowserWindow"
+        weight: 0.88
+        description: "DCOM ShellBrowserWindow"
+
+    event_ids:
+      moderate: [4688, 1]
+
+  # ============================================
+  # INITIAL ACCESS
+  # ============================================
+  T1566.001:
+    name: "Spearphishing Attachment"
+    tactic: "initial-access"
+    description: "Adversaries may send spearphishing emails with malicious attachments"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "o365:management:activity"
+          - "ms:o365:management"
+          - "exchange"
+        datamodels: ["Email"]
+      moderate:
+        sourcetypes:
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+
+    field_indicators:
+      strong:
+        - "AttachmentName"
+        - "AttachmentExtension"
+        - "SenderAddress"
+        - "file_name"
+      moderate:
+        - "Subject"
+        - "RecipientAddress"
+
+    behavioral_patterns:
+      - pattern: "(?i)\\.(doc|docm|xls|xlsm|ppt|pptm)\\b"
+        weight: 0.75
+        description: "Office document extensions"
+      - pattern: "(?i)\\.(hta|js|vbs|wsf)\\b"
+        weight: 0.85
+        description: "Script file extensions"
+      - pattern: "(?i)phish"
+        weight: 0.80
+        description: "Phishing reference"
+      - pattern: "(?i)macro.*exec"
+        weight: 0.85
+        description: "Macro execution"
+      - pattern: "(?i)malicious.*attachment"
+        weight: 0.80
+        description: "Malicious attachment reference"
+
+    event_ids: []
+
+  T1078:
+    name: "Valid Accounts"
+    tactic: "defense-evasion"
+    description: "Adversaries may use valid accounts to maintain access"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "azure:aad:signin"
+          - "o365:management:activity"
+        datamodels: ["Authentication"]
+
+    field_indicators:
+      strong:
+        - "LogonType"
+        - "AuthenticationMethod"
+        - "user"
+        - "src"
+      moderate:
+        - "dest"
+        - "ResultType"
+
+    behavioral_patterns:
+      - pattern: "(?i)valid.*account"
+        weight: 0.70
+        description: "Valid account reference"
+      - pattern: "(?i)compromised.*credential"
+        weight: 0.85
+        description: "Compromised credential"
+      - pattern: "(?i)suspicious.*logon"
+        weight: 0.75
+        description: "Suspicious logon reference"
+      - pattern: "(?i)anomalous.*authentication"
+        weight: 0.80
+        description: "Anomalous authentication"
+
+    event_ids:
+      strong: [4624, 4625, 4648]
+
+  T1078.004:
+    name: "Cloud Accounts"
+    tactic: "defense-evasion"
+    description: "Adversaries may use compromised cloud accounts"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "azure:aad:signin"
+          - "azure:aad:audit"
+          - "o365:management:activity"
+          - "aws:cloudtrail"
+        datamodels: ["Authentication"]
+
+    field_indicators:
+      strong:
+        - "UserPrincipalName"
+        - "RiskState"
+        - "RiskLevel"
+        - "Location"
+      moderate:
+        - "IPAddress"
+        - "DeviceDetail"
+
+    behavioral_patterns:
+      - pattern: "(?i)impossible.*travel"
+        weight: 0.90
+        description: "Impossible travel detection"
+      - pattern: "(?i)risky.*sign-?in"
+        weight: 0.85
+        description: "Risky sign-in"
+      - pattern: "(?i)unfamiliar.*location"
+        weight: 0.80
+        description: "Unfamiliar location"
+      - pattern: "(?i)anonymous.*IP"
+        weight: 0.78
+        description: "Anonymous IP access"
+      - pattern: "(?i)leaked.*credential"
+        weight: 0.88
+        description: "Leaked credentials"
+
+    event_ids: []
+
+  # ============================================
+  # COMMAND AND CONTROL
+  # ============================================
+  T1071.004:
+    name: "DNS"
+    tactic: "command-and-control"
+    description: "Adversaries may use DNS for command and control"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "dns"
+          - "stream:dns"
+          - "cisco:sourcefire"
+        datamodels: ["Network_Resolution"]
+
+    field_indicators:
+      strong:
+        - "query"
+        - "query_length"
+        - "answer"
+        - "record_type"
+      moderate:
+        - "src"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)dns.*tunnel"
+        weight: 0.90
+        description: "DNS tunneling"
+      - pattern: "(?i)dns.*exfil"
+        weight: 0.88
+        description: "DNS exfiltration"
+      - pattern: "(?i)dns.*beacon"
+        weight: 0.85
+        description: "DNS beaconing"
+      - pattern: "(?i)query.*length.*>\\s*50"
+        weight: 0.80
+        description: "Long DNS query"
+      - pattern: "(?i)high.*entropy"
+        weight: 0.75
+        description: "High entropy domain"
+      - pattern: "(?i)TXT.*record"
+        weight: 0.70
+        description: "TXT record query"
+
+    event_ids: []
+
+  # ============================================
+  # DISCOVERY
+  # ============================================
+  T1482:
+    name: "Domain Trust Discovery"
+    tactic: "discovery"
+    description: "Adversaries may attempt to gather information about domain trusts"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "process_name"
+      moderate:
+        - "user"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)nltest.*/domain_trusts"
+        weight: 0.92
+        description: "Nltest domain trusts"
+      - pattern: "(?i)Get-ADTrust"
+        weight: 0.90
+        description: "PowerShell AD trust"
+      - pattern: "(?i)dsquery.*trustedDomain"
+        weight: 0.88
+        description: "DSQuery trusted domain"
+      - pattern: "(?i)domain.*trust"
+        weight: 0.65
+        description: "Domain trust reference"
+
+    event_ids:
+      moderate: [4688]
+
+  T1087:
+    name: "Account Discovery"
+    tactic: "discovery"
+    description: "Adversaries may attempt to get a listing of accounts"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "process_name"
+      moderate:
+        - "user"
+        - "dest"
+
+    behavioral_patterns:
+      - pattern: "(?i)net\\s+user"
+        weight: 0.80
+        description: "Net user command"
+      - pattern: "(?i)net\\s+localgroup"
+        weight: 0.78
+        description: "Net localgroup command"
+      - pattern: "(?i)Get-ADUser"
+        weight: 0.85
+        description: "PowerShell Get-ADUser"
+      - pattern: "(?i)Get-LocalUser"
+        weight: 0.82
+        description: "PowerShell Get-LocalUser"
+      - pattern: "(?i)whoami"
+        weight: 0.60
+        description: "Whoami command"
+      - pattern: "(?i)quser"
+        weight: 0.65
+        description: "Query user command"
+
+    event_ids:
+      moderate: [4688, 4798, 4799]
+
+  T1135:
+    name: "Network Share Discovery"
+    tactic: "discovery"
+    description: "Adversaries may look for folders and drives shared on remote systems"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "WinEventLog:Security"
+          - "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        datamodels: ["Endpoint", "Network_Traffic"]
+
+    field_indicators:
+      strong:
+        - "CommandLine"
+        - "ShareName"
+      moderate:
+        - "process_name"
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)net\\s+view"
+        weight: 0.85
+        description: "Net view command"
+      - pattern: "(?i)net\\s+share"
+        weight: 0.80
+        description: "Net share command"
+      - pattern: "(?i)Get-SmbShare"
+        weight: 0.82
+        description: "PowerShell Get-SmbShare"
+      - pattern: "(?i)shares.*enum"
+        weight: 0.75
+        description: "Share enumeration reference"
+
+    event_ids:
+      moderate: [4688, 5140]
+
+  # ============================================
+  # COLLECTION
+  # ============================================
+  T1114:
+    name: "Email Collection"
+    tactic: "collection"
+    description: "Adversaries may target email to collect sensitive information"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "o365:management:activity"
+          - "ms:o365:management"
+          - "exchange"
+        datamodels: ["Email"]
+
+    field_indicators:
+      strong:
+        - "MailboxOwnerUPN"
+        - "Operation"
+        - "Item"
+      moderate:
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)\\.pst\\b"
+        weight: 0.85
+        description: "PST file access"
+      - pattern: "(?i)Export-Mailbox"
+        weight: 0.90
+        description: "Mailbox export"
+      - pattern: "(?i)MailItemsAccessed"
+        weight: 0.75
+        description: "Mail items accessed"
+      - pattern: "(?i)email.*collect"
+        weight: 0.70
+        description: "Email collection reference"
+
+    event_ids: []
+
+  T1114.003:
+    name: "Email Forwarding Rule"
+    tactic: "collection"
+    description: "Adversaries may setup email forwarding rules to collect information"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "o365:management:activity"
+          - "ms:o365:management"
+        datamodels: ["Email"]
+
+    field_indicators:
+      strong:
+        - "Operation"
+        - "Parameters"
+        - "ForwardingAddress"
+        - "ForwardingSmtpAddress"
+      moderate:
+        - "user"
+
+    behavioral_patterns:
+      - pattern: "(?i)Set-InboxRule"
+        weight: 0.90
+        description: "Set inbox rule"
+      - pattern: "(?i)New-InboxRule"
+        weight: 0.88
+        description: "New inbox rule"
+      - pattern: "(?i)ForwardTo"
+        weight: 0.85
+        description: "Forward to parameter"
+      - pattern: "(?i)RedirectTo"
+        weight: 0.85
+        description: "Redirect to parameter"
+      - pattern: "(?i)UpdateInboxRules"
+        weight: 0.80
+        description: "Update inbox rules"
+      - pattern: "(?i)mail.*forward"
+        weight: 0.75
+        description: "Mail forwarding reference"
+
+    event_ids: []
+
+  # ============================================
+  # CLOUD - AWS
+  # ============================================
+  T1098.001:
+    name: "Additional Cloud Credentials"
+    tactic: "persistence"
+    description: "Adversaries may add additional credentials to cloud accounts"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "aws:cloudtrail"
+          - "azure:aad:audit"
+
+    field_indicators:
+      strong:
+        - "eventName"
+        - "userIdentity"
+        - "requestParameters"
+      moderate:
+        - "sourceIPAddress"
+
+    behavioral_patterns:
+      - pattern: "(?i)CreateAccessKey"
+        weight: 0.88
+        description: "AWS access key creation"
+      - pattern: "(?i)PutUserPolicy"
+        weight: 0.85
+        description: "IAM user policy attachment"
+      - pattern: "(?i)AttachUserPolicy"
+        weight: 0.85
+        description: "IAM policy attachment"
+      - pattern: "(?i)CreatePolicyVersion"
+        weight: 0.80
+        description: "Policy version creation"
+      - pattern: "(?i)UpdateAssumeRolePolicy"
+        weight: 0.82
+        description: "Assume role policy update"
+
+    event_ids: []
+
+  T1098.003:
+    name: "Additional Cloud Roles"
+    tactic: "persistence"
+    description: "Adversaries may add roles to cloud accounts for persistence"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "azure:aad:audit"
+          - "o365:management:activity"
+
+    field_indicators:
+      strong:
+        - "Operation"
+        - "ModifiedProperties"
+        - "Target"
+      moderate:
+        - "Actor"
+
+    behavioral_patterns:
+      - pattern: "(?i)Add\\s+app\\s+role"
+        weight: 0.90
+        description: "Add app role assignment"
+      - pattern: "(?i)ConsentToApplication"
+        weight: 0.88
+        description: "Application consent"
+      - pattern: "(?i)OAuth"
+        weight: 0.70
+        description: "OAuth reference"
+      - pattern: "(?i)consent.*grant"
+        weight: 0.82
+        description: "Consent grant"
+      - pattern: "(?i)application.*permission"
+        weight: 0.75
+        description: "Application permission"
+
+    event_ids: []
+
+  T1562.007:
+    name: "Disable or Modify Cloud Firewall"
+    tactic: "defense-evasion"
+    description: "Adversaries may disable or modify cloud firewall rules"
+
+    data_sources:
+      strong:
+        sourcetypes:
+          - "aws:cloudtrail"
+          - "azure:monitor"
+          - "gcp:pubsub:message"
+
+    field_indicators:
+      strong:
+        - "eventName"
+        - "requestParameters"
+      moderate:
+        - "sourceIPAddress"
+        - "userIdentity"
+
+    behavioral_patterns:
+      - pattern: "(?i)AuthorizeSecurityGroupIngress"
+        weight: 0.88
+        description: "Security group ingress authorization"
+      - pattern: "(?i)0\\.0\\.0\\.0/0"
+        weight: 0.85
+        description: "Open to world CIDR"
+      - pattern: "(?i)security.*group.*change"
+        weight: 0.75
+        description: "Security group change"
+      - pattern: "(?i)DeleteSecurityGroup"
+        weight: 0.80
+        description: "Security group deletion"
+
+    event_ids: []

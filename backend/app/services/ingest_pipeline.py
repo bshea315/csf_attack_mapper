@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.models.detection import Detection, DetectionVersion, IngestBatch
 from app.models.spl_artifact import SplParseArtifact
@@ -16,7 +16,9 @@ from app.models.mitre import DetectionMitreMapping
 from app.models.csf import DetectionCsfImpact
 from app.services.spl_parser import SPLParser
 from app.services.mitre_mapper import MitreMapper
+from app.services.enhanced_mitre_mapper import EnhancedMitreMapper, get_mapper
 from app.services.csf_calculator import CSFCalculator
+from app.config import settings
 
 
 @dataclass
@@ -48,11 +50,27 @@ class IngestResult:
 class IngestPipeline:
     """Pipeline for ingesting and processing detections."""
 
-    def __init__(self, db: AsyncSession):
-        """Initialize pipeline with database session."""
+    def __init__(self, db: AsyncSession, use_enhanced_mapper: bool = True):
+        """
+        Initialize pipeline with database session.
+
+        Args:
+            db: Database session
+            use_enhanced_mapper: If True, use the multi-signal enhanced mapper.
+                                If False, use the legacy rule-based mapper.
+        """
         self.db = db
         self.spl_parser = SPLParser()
-        self.mitre_mapper = MitreMapper()
+        self.use_enhanced_mapper = use_enhanced_mapper
+
+        # Initialize the appropriate mapper
+        if use_enhanced_mapper:
+            self.enhanced_mapper = EnhancedMitreMapper()
+            self.mitre_mapper = None
+        else:
+            self.mitre_mapper = MitreMapper()
+            self.enhanced_mapper = None
+
         self.csf_calculator = CSFCalculator()
 
     async def ingest_csv(
@@ -427,10 +445,18 @@ class IngestPipeline:
 
         return detection.id
 
-    async def _clear_mappings(self, detection_id: int):
-        """Clear existing mappings for a detection."""
-        # Delete MITRE mappings
+    async def _clear_mappings(self, detection_id: int, preserve_manual: bool = True):
+        """
+        Clear existing mappings for a detection.
+
+        Args:
+            detection_id: Detection to clear mappings for
+            preserve_manual: If True, keep manually-added mappings (default: True)
+        """
+        # Delete MITRE mappings (optionally preserving manual ones)
         stmt = select(DetectionMitreMapping).where(DetectionMitreMapping.detection_id == detection_id)
+        if preserve_manual:
+            stmt = stmt.where(DetectionMitreMapping.method != 'manual')
         result = await self.db.execute(stmt)
         for mapping in result.scalars():
             await self.db.delete(mapping)
@@ -489,7 +515,7 @@ class IngestPipeline:
             self.db.add(artifact)
 
     async def _map_to_mitre(self, detection: Detection, user_id: Optional[int]):
-        """Map detection to MITRE techniques using rules."""
+        """Map detection to MITRE techniques using rules or enhanced multi-signal scoring."""
         # Get SPL artifacts for mapping
         stmt = select(SplParseArtifact).where(SplParseArtifact.detection_id == detection.id)
         result = await self.db.execute(stmt)
@@ -500,29 +526,88 @@ class IngestPipeline:
         indexes = json.loads(artifact.indexes) if artifact and artifact.indexes else []
         datamodels = json.loads(artifact.datamodels) if artifact and artifact.datamodels else []
 
-        mapping_result = self.mitre_mapper.map_detection(
-            name=detection.name,
-            description=detection.description or '',
-            spl=detection.spl,
-            sourcetypes=sourcetypes,
-            fields=fields,
-            indexes=indexes,
-            datamodels=datamodels,
-        )
+        # Get original MITRE tags if present
+        original_mitre_tags = []
+        if detection.original_mitre_tags:
+            try:
+                original_mitre_tags = json.loads(detection.original_mitre_tags)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-        for match in mapping_result.matches:
-            mapping = DetectionMitreMapping(
-                detection_id=detection.id,
-                technique_id=match.technique_id,
-                confidence=match.confidence,
-                method='rule',
-                rule_id=match.rule_id,
-                rationale=match.rationale,
-                evidence=json.dumps(match.evidence),
-                is_accepted=True,
-                created_by_id=user_id,
+        # Get existing manual mappings to avoid duplicates
+        stmt = select(DetectionMitreMapping.technique_id).where(
+            DetectionMitreMapping.detection_id == detection.id,
+            DetectionMitreMapping.method == 'manual'
+        )
+        result = await self.db.execute(stmt)
+        manual_technique_ids = {row[0] for row in result.all()}
+
+        if self.use_enhanced_mapper and self.enhanced_mapper:
+            # Use enhanced multi-signal mapper
+            mapping_result = self.enhanced_mapper.map_detection(
+                name=detection.name,
+                description=detection.description or '',
+                spl=detection.spl,
+                sourcetypes=sourcetypes,
+                fields=fields,
+                indexes=indexes,
+                datamodels=datamodels,
+                original_mitre_tags=original_mitre_tags,
             )
-            self.db.add(mapping)
+
+            # Get accepted mappings based on confidence threshold
+            accepted = mapping_result.get_accepted_mappings(min_confidence='low')
+
+            for match in accepted:
+                # Skip if technique already has a manual mapping (manual takes priority)
+                if match.technique_id in manual_technique_ids:
+                    continue
+
+                mapping = DetectionMitreMapping(
+                    detection_id=detection.id,
+                    technique_id=match.technique_id,
+                    confidence=match.final_score,
+                    method='enhanced_multi_signal',
+                    rule_id=None,
+                    rationale=match.rationale,
+                    evidence=json.dumps({
+                        'signal_scores': match.signal_scores.to_dict(),
+                        'confidence_level': match.confidence_level,
+                        'evidence_details': match.evidence,
+                    }),
+                    is_accepted=True,
+                    created_by_id=user_id,
+                )
+                self.db.add(mapping)
+        else:
+            # Use legacy rule-based mapper
+            mapping_result = self.mitre_mapper.map_detection(
+                name=detection.name,
+                description=detection.description or '',
+                spl=detection.spl,
+                sourcetypes=sourcetypes,
+                fields=fields,
+                indexes=indexes,
+                datamodels=datamodels,
+            )
+
+            for match in mapping_result.matches:
+                # Skip if technique already has a manual mapping (manual takes priority)
+                if match.technique_id in manual_technique_ids:
+                    continue
+
+                mapping = DetectionMitreMapping(
+                    detection_id=detection.id,
+                    technique_id=match.technique_id,
+                    confidence=match.confidence,
+                    method='rule',
+                    rule_id=match.rule_id,
+                    rationale=match.rationale,
+                    evidence=json.dumps(match.evidence),
+                    is_accepted=True,
+                    created_by_id=user_id,
+                )
+                self.db.add(mapping)
 
     async def _calculate_csf_impact(self, detection: Detection):
         """Calculate CSF impact scores for detection."""
@@ -549,3 +634,105 @@ class IngestPipeline:
                 contributing_techniques=json.dumps(impact.contributing_techniques),
             )
             self.db.add(csf_impact)
+
+    async def reprocess_all_mappings(
+        self,
+        user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Re-process MITRE mappings and CSF impacts for all detections.
+
+        This clears existing mappings and re-runs the mapper (enhanced or legacy)
+        on all detections. Useful when:
+        - Switching to enhanced mapper
+        - Updating technique indicators
+        - Fixing mapping issues
+
+        Args:
+            user_id: User ID for audit trail
+
+        Returns:
+            Summary of re-processing results
+        """
+        result = {
+            'total_detections': 0,
+            'successful': 0,
+            'failed': 0,
+            'errors': [],
+            'mapper_type': 'enhanced_multi_signal' if self.use_enhanced_mapper else 'rule_based',
+        }
+
+        # Get all detections
+        stmt = select(Detection)
+        db_result = await self.db.execute(stmt)
+        detections = db_result.scalars().all()
+
+        result['total_detections'] = len(detections)
+
+        for detection in detections:
+            try:
+                # Clear existing mappings
+                await self._clear_mappings(detection.id)
+
+                # Re-map to MITRE
+                await self._map_to_mitre(detection, user_id)
+
+                # Re-calculate CSF impact
+                await self._calculate_csf_impact(detection)
+
+                result['successful'] += 1
+            except Exception as e:
+                result['failed'] += 1
+                result['errors'].append(f"{detection.detection_id}: {str(e)}")
+
+        await self.db.commit()
+
+        return result
+
+    async def reprocess_single_detection(
+        self,
+        detection_id: int,
+        user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Re-process MITRE mappings and CSF impacts for a single detection.
+
+        Args:
+            detection_id: Database ID of the detection
+            user_id: User ID for audit trail
+
+        Returns:
+            Summary of re-processing results
+        """
+        # Get detection
+        stmt = select(Detection).where(Detection.id == detection_id)
+        db_result = await self.db.execute(stmt)
+        detection = db_result.scalar_one_or_none()
+
+        if not detection:
+            raise ValueError(f"Detection not found: {detection_id}")
+
+        # Clear existing mappings
+        await self._clear_mappings(detection.id)
+
+        # Re-map to MITRE
+        await self._map_to_mitre(detection, user_id)
+
+        # Re-calculate CSF impact
+        await self._calculate_csf_impact(detection)
+
+        await self.db.commit()
+
+        # Get new mapping count
+        stmt = select(func.count(DetectionMitreMapping.id)).where(
+            DetectionMitreMapping.detection_id == detection_id
+        )
+        count_result = await self.db.execute(stmt)
+        mapping_count = count_result.scalar() or 0
+
+        return {
+            'detection_id': detection_id,
+            'detection_name': detection.name,
+            'mappings_created': mapping_count,
+            'mapper_type': 'enhanced_multi_signal' if self.use_enhanced_mapper else 'rule_based',
+        }

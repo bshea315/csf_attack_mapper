@@ -124,6 +124,10 @@ export interface TechniqueCoverage {
   is_subtechnique: boolean;
   parent_technique_id: string | null;
   url: string | null;
+  // Added when grouping with subtechniques
+  subtechniques?: TechniqueCoverage[];
+  aggregated_detection_count?: number;
+  tactic?: string;
 }
 
 export interface AttackCoverageResponse {
@@ -147,6 +151,8 @@ export interface CsfFunctionCoverage {
   }>;
   total_subcategories: number;
   covered_subcategories: number;
+  total_categories: number;
+  covered_categories: number;
   average_score: number;
   detection_count: number;
 }
@@ -182,10 +188,19 @@ export interface GapAnalysisResponse {
   high_priority_items: GapItem[];
 }
 
+// Score breakdown for enhanced recommendation engine
+export interface ScoreBreakdown {
+  coverage_gap: number;
+  impact: number;
+  effort: number;
+  risk: number;
+}
+
 export interface Recommendation {
   id: string;
   type: string;
   priority: number;
+  priority_score?: number;  // New: actual calculated score
   title: string;
   description: string;
   evidence: string[];
@@ -193,12 +208,21 @@ export interface Recommendation {
   affected_techniques: string[];
   affected_csf: string[];
   detection_id?: number;
+  score_breakdown?: ScoreBreakdown;  // New: detailed scoring breakdown
+  rationale?: string;  // New: human-readable explanation
+  // Legacy fields for backwards compatibility
+  related_techniques?: string[];
+  category?: string;
+  estimated_impact?: string;
+  effort?: string;
 }
 
 export interface RecommendationResponse {
   recommendations: Recommendation[];
   total_count: number;
+  returned_count?: number;  // New: number actually returned (may be less than total)
   by_type: Record<string, number>;
+  scoring_weights?: Record<string, number>;  // New: weights used for scoring
 }
 
 // Ingest types
@@ -214,4 +238,18 @@ export interface IngestBatch {
   error_message: string | null;
   created_at: string;
   completed_at: string | null;
+}
+
+// Reprocess types
+export interface ReprocessRequest {
+  use_enhanced_mapper: boolean;
+  confirmation: string;
+}
+
+export interface ReprocessResponse {
+  total_detections: number;
+  successful: number;
+  failed: number;
+  errors: string[];
+  mapper_type: string;
 }

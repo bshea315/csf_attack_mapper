@@ -7,6 +7,7 @@ from app.models.detection import Detection, IngestBatch
 from app.models.spl_artifact import SplParseArtifact
 from app.models.mitre import MitreTechnique, DetectionMitreMapping
 from app.models.csf import CsfCategory, MitreToCsfMapping, DetectionCsfImpact
+from app.services.recommendation_engine import RecommendationEngine
 
 
 class CoverageAnalyzer:
@@ -166,18 +167,39 @@ class CoverageAnalyzer:
 
     async def get_csf_coverage(self) -> Dict[str, Any]:
         """Get NIST CSF 2.0 coverage data."""
-        # Get all CSF categories with impact scores
-        stmt = select(
-            CsfCategory,
+        # First, get category-level impact data from detection_csf_impact
+        # detection_csf_impact.csf_id stores category codes like "DE.CM", "PR.AA"
+        impact_stmt = select(
+            DetectionCsfImpact.csf_id,
             func.count(func.distinct(DetectionCsfImpact.detection_id)).label('detection_count'),
             func.avg(DetectionCsfImpact.impact_score).label('avg_score')
-        ).outerjoin(
-            DetectionCsfImpact,
-            CsfCategory.id == DetectionCsfImpact.csf_id
-        ).group_by(CsfCategory.id)
+        ).group_by(DetectionCsfImpact.csf_id)
 
-        result = await self.db.execute(stmt)
-        rows = result.all()
+        impact_result = await self.db.execute(impact_stmt)
+        impact_by_category = {
+            row[0]: {'detection_count': row[1] or 0, 'avg_score': row[2] or 0.0}
+            for row in impact_result.all()
+        }
+
+        # Get all CSF categories (subcategories) grouped by category
+        cat_stmt = select(CsfCategory)
+        cat_result = await self.db.execute(cat_stmt)
+        all_categories = cat_result.scalars().all()
+
+        # Build unique categories by function
+        # csf_categories table has subcategories (DE.CM-1) with category field (DE.CM)
+        category_map: Dict[str, Dict] = {}  # category -> {function, name, subcategories}
+
+        for csf in all_categories:
+            cat_code = csf.category  # e.g., "DE.CM"
+            if cat_code not in category_map:
+                category_map[cat_code] = {
+                    'category': cat_code,
+                    'function': csf.function,
+                    'name': csf.name,
+                    'subcategory_ids': [],
+                }
+            category_map[cat_code]['subcategory_ids'].append(csf.id)
 
         # Organize by function
         functions_data: Dict[str, Dict] = {}
@@ -185,43 +207,49 @@ class CoverageAnalyzer:
             functions_data[func_name] = {
                 'function': func_name,
                 'categories': [],
+                'total_categories': 0,
+                'covered_categories': 0,
                 'total_subcategories': 0,
                 'covered_subcategories': 0,
                 'total_score': 0.0,
                 'detection_count': 0,
             }
 
-        for row in rows:
-            csf = row[0]
-            detection_count = row[1] or 0
-            avg_score = row[2] or 0.0
+        for cat_code, cat_info in category_map.items():
+            func_name = cat_info['function']
+            impact_data = impact_by_category.get(cat_code, {'detection_count': 0, 'avg_score': 0.0})
+            detection_count = impact_data['detection_count']
+            avg_score = impact_data['avg_score']
+            num_subcategories = len(cat_info['subcategory_ids'])
 
-            func_name = csf.function
             if func_name in functions_data:
                 functions_data[func_name]['categories'].append({
-                    'id': csf.id,
-                    'name': csf.name,
-                    'category': csf.category,
+                    'id': cat_code,
+                    'name': cat_info['name'],
+                    'category': cat_code,
                     'detection_count': detection_count,
-                    'score': avg_score,
+                    'score': round(avg_score, 3),
+                    'subcategory_count': num_subcategories,
                 })
-                functions_data[func_name]['total_subcategories'] += 1
+                functions_data[func_name]['total_categories'] += 1
+                functions_data[func_name]['total_subcategories'] += num_subcategories
                 if detection_count > 0:
-                    functions_data[func_name]['covered_subcategories'] += 1
+                    functions_data[func_name]['covered_categories'] += 1
+                    functions_data[func_name]['covered_subcategories'] += num_subcategories
                     functions_data[func_name]['total_score'] += avg_score
                     functions_data[func_name]['detection_count'] += detection_count
 
         # Calculate averages
         for func_name, data in functions_data.items():
-            if data['covered_subcategories'] > 0:
-                data['average_score'] = data['total_score'] / data['covered_subcategories']
+            if data['covered_categories'] > 0:
+                data['average_score'] = data['total_score'] / data['covered_categories']
             else:
                 data['average_score'] = 0.0
 
         # Calculate overall and per-function scores
-        overall_score = sum(
-            f['average_score'] for f in functions_data.values()
-        ) / len(functions_data) if functions_data else 0.0
+        total_covered = sum(f['covered_categories'] for f in functions_data.values())
+        total_score = sum(f['total_score'] for f in functions_data.values())
+        overall_score = total_score / total_covered if total_covered > 0 else 0.0
 
         return {
             'functions': list(functions_data.values()),
@@ -378,70 +406,29 @@ class CoverageAnalyzer:
 
         return "; ".join(recommendations) if recommendations else "Review detection quality"
 
-    async def get_recommendations(self) -> Dict[str, Any]:
-        """Get improvement recommendations."""
-        recommendations = []
+    async def get_recommendations(
+        self,
+        limit: int = 20,
+        include_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get improvement recommendations using sophisticated multi-dimensional scoring.
 
-        gaps = await self.get_gaps()
+        This method uses the RecommendationEngine for deterministic, consistent
+        prioritization based on coverage gaps, impact, effort, and risk.
 
-        priority = 1
-        # Add technique coverage recommendations
-        for gap in gaps['technique_gaps'][:5]:
-            recommendations.append({
-                'id': f"rec_tech_{gap['id']}",
-                'type': 'add_detection',
-                'priority': priority,
-                'title': f"Add detection for {gap['name']}",
-                'description': gap['description'],
-                'evidence': [f"Technique {gap['id']} has no mapped detections"],
-                'impact_estimate': 0.15,
-                'affected_techniques': [gap['id']],
-                'affected_csf': [],
-            })
-            priority += 1
+        Args:
+            limit: Maximum number of recommendations to return
+            include_types: Filter to specific recommendation types
 
-        # Add CSF coverage recommendations
-        for gap in gaps['csf_gaps'][:3]:
-            recommendations.append({
-                'id': f"rec_csf_{gap['id']}",
-                'type': 'add_detection',
-                'priority': priority,
-                'title': f"Improve coverage for {gap['name']}",
-                'description': gap['description'],
-                'evidence': [f"CSF category {gap['id']} has low coverage"],
-                'impact_estimate': 0.12,
-                'affected_techniques': [],
-                'affected_csf': [gap['id']],
-            })
-            priority += 1
-
-        # Add quality improvement recommendations
-        for issue in gaps['quality_issues'][:5]:
-            rec_type = 'enable_detection' if 'disabled' in issue['description'] else 'tune_detection'
-            recommendations.append({
-                'id': f"rec_quality_{issue['id']}",
-                'type': rec_type,
-                'priority': priority,
-                'title': f"Fix quality issues in: {issue['name'][:40]}",
-                'description': issue['recommendation'],
-                'evidence': [issue['description']],
-                'impact_estimate': 0.08,
-                'affected_techniques': [],
-                'affected_csf': [],
-                'detection_id': issue.get('detection_id'),
-            })
-            priority += 1
-
-        by_type = {}
-        for rec in recommendations:
-            rec_type = rec['type']
-            by_type[rec_type] = by_type.get(rec_type, 0) + 1
-
-        return {
-            'recommendations': recommendations,
-            'total_count': len(recommendations),
-            'by_type': by_type,
-        }
+        Returns:
+            Dict with recommendations list, counts, and scoring metadata
+        """
+        engine = RecommendationEngine(self.db)
+        return await engine.generate_recommendations(
+            limit=limit,
+            include_types=include_types,
+        )
 
     async def get_crosswalk(
         self,
