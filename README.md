@@ -49,10 +49,47 @@ A security tool that ingests Splunk SPL detection rules, maps them to MITRE ATT&
 - Node.js 18+
 - npm or yarn
 
-### Backend Setup
+### One-Click Setup (Recommended)
+
+The easiest way to get started is with the automated setup script. This script:
+- Creates Python virtual environment and installs dependencies
+- Initializes the database with MITRE ATT&CK and CSF 2.0 reference data
+- Loads 20 sample SPL detections with automatic MITRE mapping
+- Creates 8 SOAR playbooks with 200 sample execution runs
+- Establishes detection-to-playbook links for automation tracking
+- Installs frontend dependencies
 
 ```bash
-# Navigate to backend directory
+# Clone the repository
+git clone <repository-url>
+cd csf_attack_mapper
+
+# Run the setup script
+./setup.sh
+```
+
+After setup completes, you'll have a fully populated demo environment ready to explore.
+
+**Start the servers:**
+
+```bash
+# Terminal 1: Backend
+cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2: Frontend
+cd frontend
+npm run dev
+```
+
+### Manual Setup (Alternative)
+
+If you prefer manual setup or need to customize the process:
+
+#### Backend Setup
+
+```bash
 cd backend
 
 # Create virtual environment
@@ -63,22 +100,23 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Initialize database and load reference data
-python scripts/init_db.py
+python ../scripts/init_db.py
+
+# (Optional) Load sample detections
+python ../scripts/load_sample_data.py
+
+# (Optional) Load SOAR playbook data
+python ../scripts/seed_soar_fixtures.py
 
 # Start the backend server
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend Setup
+#### Frontend Setup
 
 ```bash
-# Navigate to frontend directory (in a new terminal)
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm run dev
 ```
 
@@ -158,12 +196,50 @@ DET-001|||Brute Force Login|||index=auth | stats count by user | where count > 1
 
 ## Sample Data
 
-Sample detections are provided in `sample_data/sample_detections.csv`. Import them through the Ingest page or using the API.
+The setup script automatically loads sample data to demonstrate all features:
+
+### Sample Detections (`sample_data/sample_detections.csv`)
+
+20 SPL detection rules covering common attack techniques:
+- Windows authentication monitoring (brute force, Kerberoasting)
+- Credential dumping detection (LSASS access)
+- PowerShell and command-line monitoring
+- Persistence mechanisms (scheduled tasks, services, registry)
+- Lateral movement (RDP, PsExec, WMI)
+- Cloud security (Azure AD, AWS, O365)
+
+Each detection is automatically:
+- Parsed to extract SPL artifacts (indexes, sourcetypes, fields)
+- Mapped to MITRE ATT&CK techniques with confidence scores
+- Cross-walked to NIST CSF 2.0 categories
+
+### Sample Playbooks
+
+8 SOAR playbooks demonstrating automation workflows:
+
+| Playbook | Category | Time Saved |
+|----------|----------|------------|
+| Investigate Malware Alert | Investigation | 45 min |
+| Block IP on Firewall | Containment | 15 min |
+| Isolate Compromised Endpoint | Containment | 20 min |
+| Phishing Email Response | Response | 30 min |
+| Credential Compromise Response | Response | 25 min |
+| Threat Intelligence Enrichment | Enrichment | 10 min |
+| Brute Force Attack Response | Response | 20 min |
+| Data Exfiltration Response | Investigation | 60 min |
+
+Each playbook includes:
+- 200 simulated execution runs over 30 days
+- Action-level metrics with success/failure tracking
+- Links to relevant detections for automation tracking
+
+You can also import detections manually through the Ingest page or using the API.
 
 ## Project Structure
 
 ```
 csf_attack_mapper/
+├── setup.sh                   # One-click setup script
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes/        # API endpoints
@@ -182,8 +258,11 @@ csf_attack_mapper/
 │   │   │   ├── coverage_analyzer.py
 │   │   │   └── splunk_client.py   # Splunk REST client
 │   │   └── core/              # Security utilities
-│   ├── scripts/               # Init scripts
 │   └── tests/                 # Unit tests
+├── scripts/                   # Setup and data loading
+│   ├── init_db.py                 # Initialize database
+│   ├── load_sample_data.py        # Load sample detections
+│   └── seed_soar_fixtures.py      # Load SOAR playbooks
 ├── frontend/
 │   ├── src/
 │   │   ├── api/               # API client
